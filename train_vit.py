@@ -119,6 +119,8 @@ def main():
         try:
             wandb.init(
                 project=WANDB_PROJECT,
+                job_type="vit",
+                tags=["vit"],
                 config=dict(
                     model="vit_base_patch16_224", epochs=EPOCHS, batch=BATCH,
                     lr=LR, img_size=IMG_SIZE, pretrained=PRETRAINED,

@@ -198,9 +198,11 @@ def main():
         try:
             wandb.init(
                 project=WANDB_PROJECT,
+                job_type="resnet50",
+                tags=["resnet50"],
                 config=dict(
-                    epochs=EPOCHS, batch=BATCH, lr=LR, img_size=IMG_SIZE,
-                    pretrained=PRETRAINED, grad_clip=GRAD_CLIP,
+                    model="resnet50", epochs=EPOCHS, batch=BATCH, lr=LR,
+                    img_size=IMG_SIZE, pretrained=PRETRAINED, grad_clip=GRAD_CLIP,
                     weight_decay=1e-3, max_train=MAX_TRAIN, max_val=MAX_VAL,
                 ),
             )
