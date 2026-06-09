@@ -24,7 +24,7 @@ from model import build_model, build_vit, save_gradcam, GradCAM
 # ---------------------------------------------------------------------------
 # CONFIG — edit these
 # ---------------------------------------------------------------------------
-MODEL_TYPE = "resnet50"   # "resnet50" | "vit"
+MODEL_TYPE = "vit"   # "resnet50" | "vit"
 
 DATA_ROOT        = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
 EPOCHS           = 20
@@ -39,6 +39,8 @@ GRADCAM_INTERVAL = 2             # epochs between GradCAM logs (ResNet only)
 N_GRADCAM_VIZ    = 2             # samples per split per GradCAM log
 WANDB_PROJECT    = "lumbar-spine-mri"
 WANDB_ENABLED    = True
+
+assert MODEL_TYPE in ["resnet50", "vit"]
 
 # Per-model hyperparams — auto-selected from MODEL_TYPE, do not edit directly
 _MODEL_CFG = {
@@ -203,14 +205,19 @@ def main():
                     weight_decay=WEIGHT_DECAY, max_train=MAX_TRAIN, max_val=MAX_VAL,
                 ),
             )
-            wandb.run.name = f"{MODEL_TYPE}-{wandb.run.name}"
-            wandb.run.save()
-            import webbrowser
-            webbrowser.open(wandb.run.url)
-            print(f"[wandb] {wandb.run.name}  {wandb.run.url}")
         except Exception as e:
             print(f"[wandb] init failed ({e}) — continuing without wandb")
             globals()["WANDB_ENABLED"] = False
+
+        if WANDB_ENABLED:
+            try:
+                wandb.run.name = f"{MODEL_TYPE}-{wandb.run.name}"
+                wandb.run.save()
+            except Exception:
+                pass  # rename failed — logging still works
+            import webbrowser
+            webbrowser.open(wandb.run.url)
+            print(f"[wandb] {wandb.run.name}  {wandb.run.url}")
 
     history = {"tr_loss": [], "tr_acc": [], "tr_gnorm": [], "vl_loss": [], "vl_acc": []}
 
