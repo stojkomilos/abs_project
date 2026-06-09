@@ -128,6 +128,8 @@ def main():
                     max_train=MAX_TRAIN, max_val=MAX_VAL,
                 ),
             )
+            wandb.run.name = f"vit-{wandb.run.name}"
+            wandb.run.save()
             import webbrowser
             webbrowser.open(wandb.run.url)
             print(f"[wandb] run url: {wandb.run.url}")

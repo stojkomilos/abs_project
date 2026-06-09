@@ -206,6 +206,8 @@ def main():
                     weight_decay=1e-3, max_train=MAX_TRAIN, max_val=MAX_VAL,
                 ),
             )
+            wandb.run.name = f"resnet50-{wandb.run.name}"
+            wandb.run.save()
             import webbrowser
             webbrowser.open(wandb.run.url)
             print(f"[wandb] run url: {wandb.run.url}")
