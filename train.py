@@ -170,7 +170,7 @@ def training_loop(model, train_loader, val_loader, criterion, optimizer, schedul
 
         if no_val:
             print(f"{epoch:3d}  {tr_loss:7.4f}  {tr_acc:6.4f}  {time.time()-t0:5.1f}s")
-            best_weights = copy.deepcopy(model.state_dict())
+            # best_weights = copy.deepcopy(model.state_dict())
         else:
             vl_loss, vl_acc = evaluate(model, val_loader, criterion, device)
             history["vl_loss"].append(vl_loss)
