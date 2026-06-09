@@ -10,3 +10,17 @@ gradcam/
 onstart.sh
 ports.log
 .vscode/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# wandb run logs
+wandb/
