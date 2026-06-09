@@ -155,31 +155,6 @@ dijagnostike.
 konvolucione neuronske mreže, ResNet, vizuelni transformer (ViT), Grad-CAM,
 računarski potpomognuta dijagnostika.
 
-\vspace{0.6cm}
-\section*{Abstract}
-\addcontentsline{toc}{section}{Abstract}
-
-Lumbar disc herniation is a common cause of low back pain, and its diagnosis typically
-relies on the examination of Magnetic Resonance Imaging (MRI) scans by an experienced
-radiologist. Because of the high cost of examinations and the uneven distribution of
-medical resources, systems that automatically analyse lumbar spine MRI scans are becoming
-increasingly important. This report presents a system for the automatic classification of
-axial lumbar spine MRI slices into two categories: \textit{disc herniation} and
-\textit{normal finding}. Two architectures are compared: a ResNet-50 convolutional neural
-network trained from scratch, and a ViT-Base/16 vision transformer fine-tuned from weights
-pre-trained on ImageNet-21k. The Grad-CAM method is used to visually interpret the
-decisions of the convolutional model by highlighting the regions of the scan that most
-influenced the prediction. The models were trained and evaluated on a publicly available
-Kaggle dataset, using data augmentation and regularisation. The best model achieves an
-accuracy of [XX.X\%], a sensitivity of [XX.X\%] and a specificity of [XX.X\%] on the test
-set, which is comparable to results reported in the relevant literature. The Grad-CAM maps
-confirm that the convolutional model focuses predominantly on the intervertebral disc and
-thecal sac region, in agreement with clinical diagnostic criteria.
-
-\vspace{0.3cm}
-\noindent\textbf{Keywords:} lumbar disc herniation, MRI, deep learning, convolutional
-neural networks, ResNet, vision transformer (ViT), Grad-CAM, computer-aided diagnosis.
-
 \newpage
 \tableofcontents
 \newpage
@@ -260,32 +235,105 @@ modela.
 \subsection{Teorijske osnove}
 \label{sec:teorija}
 
-\paragraph{Konvolucione neuronske mreže.}
-Konvoluciona neuronska mreža (engl.\ \textit{Convolutional Neural Network}, CNN) je
-arhitektura specijalizovana za obradu slika, koja kroz nizove konvolucionih slojeva uči
-hijerarhiju obeležja --- od jednostavnih ivica u plitkim slojevima do složenih
-semantičkih struktura u dubljim slojevima. U ovom radu koristi se arhitektura
-ResNet-50~\cite{he2016deep}, duboka mreža sa 50 slojeva organizovanih u rezidualne
-blokove. Osnovna ideja rezidualnog učenja je da svaki blok uči rezidualno preslikavanje
-$\mathcal{F}(x)$, dok se ulaz $x$ prosleđuje preko \textit{skip} veze, tako da blok
-računa $\mathcal{H}(x)=\mathcal{F}(x)+x$. Ovakve veze ublažavaju problem nestajućeg
-gradijenta i omogućavaju stabilno treniranje dubokih mreža.
+\subsubsection{Konvolucione neuronske mreže}
+\label{sec:cnn}
 
-\paragraph{Vizuelni transformer (ViT).}
+Konvoluciona neuronska mreža (engl.\ \textit{Convolutional Neural Network}, CNN) je
+arhitektura dubokog učenja specijalizovana za podatke sa mrežnom (prostornom) strukturom,
+kao što su slike. Osnovni gradivni element je \textbf{konvolucioni sloj}, u kome se mali
+filteri (jezgra, engl.\ \textit{kernels}) pomeraju (konvoluiraju) preko ulaza i u svakoj
+poziciji računaju težinsku sumu lokalnog okruženja piksela, dajući \textit{mapu obeležja}
+(engl.\ \textit{feature map}). Za ulaz $x$ i jezgro $w$ dimenzija $K\times K$, izlaz na
+poziciji $(i,j)$ je
+\begin{equation}
+y_{ij} = \sum_{m=0}^{K-1}\sum_{n=0}^{K-1} w_{mn}\, x_{\,i+m,\,j+n} + b,
+\label{eq:konv}
+\end{equation}
+gde je $b$ slobodni član (engl.\ \textit{bias}). Konvolucioni slojevi imaju dve ključne
+osobine koje ih čine pogodnim za slike: (i) \textbf{lokalnu povezanost} --- svaki neuron
+,,vidi'' samo malo receptivno polje ulaza, i (ii) \textbf{deljenje parametara} --- isti
+filter primenjuje se na celu sliku, što drastično smanjuje broj parametara i obezbeđuje
+\textit{translatornu ekvivarijantnost} (pomeraj na ulazu daje odgovarajući pomeraj na
+izlazu). Nakon konvolucije primenjuje se nelinearna aktivaciona funkcija, najčešće
+ispravljena linearna jedinica (engl.\ \textit{Rectified Linear Unit}, ReLU),
+$\mathrm{ReLU}(z)=\max(0,z)$, koja uvodi nelinearnost neophodnu za učenje složenih
+preslikavanja.
+
+Smenjivanjem konvolucionih slojeva sa operacijama \textbf{sažimanja} (engl.\
+\textit{pooling}) ili konvolucijama sa korakom (engl.\ \textit{stride}) prostorna
+rezolucija se postepeno smanjuje, dok se receptivno polje uvećava; tako mreža gradi
+\textbf{hijerarhiju obeležja} --- od jednostavnih ivica i tekstura u plitkim slojevima, do
+delova objekata i složenih semantičkih struktura u dubljim slojevima. Radi stabilnijeg i
+bržeg treniranja koristi se i \textit{batch} normalizacija. Na kraju mreže, globalnim
+sažimanjem mapa obeležja i jednim ili više potpuno povezanih slojeva dobija se vektor
+verovatnoća klasa.
+
+\subsubsection{Rezidualne mreže (ResNet-50)}
+\label{sec:resnet}
+
+Povećavanjem dubine ,,obične'' konvolucione mreže performanse u praksi prestaju da rastu i
+čak opadaju --- ne samo zbog preprilagođavanja, već i zbog otežane optimizacije i
+nestajućih/eksplodirajućih gradijenata. Rezidualne mreže (ResNet)~\cite{he2016deep}
+rešavaju ovaj problem uvođenjem \textbf{rezidualnih (preskočnih) veza}. Umesto da blok uči
+ciljano preslikavanje $\mathcal{H}(x)$ direktno, on uči \textit{rezidual}
+$\mathcal{F}(x)=\mathcal{H}(x)-x$, dok se ulaz $x$ prosleđuje preko identičke (\textit{skip})
+veze, tako da blok računa
+\begin{equation}
+\mathcal{H}(x)=\mathcal{F}(x)+x.
+\label{eq:rezidual}
+\end{equation}
+Učenje reziduala je lakše (u graničnom slučaju blok lako nauči identičko preslikavanje
+postavljanjem $\mathcal{F}(x)\!\approx\!0$), a identička veza obezbeđuje nesmetan protok
+gradijenta unazad, što omogućava stabilno treniranje mreža sa više desetina ili stotina
+slojeva.
+
+Korišćena varijanta \textbf{ResNet-50} ima 50 slojeva organizovanih u tzv.\
+,,\textit{bottleneck}'' blokove, od kojih se svaki sastoji od tri konvolucije
+($1\times1$, $3\times3$, $1\times1$): prva $1\times1$ konvolucija smanjuje broj kanala,
+$3\times3$ obrađuje obeležja, a poslednja $1\times1$ ih vraća na veću dimenziju, čime se
+smanjuje računska cena. Mreža počinje konvolucijom $7\times7$ i sažimanjem, a zatim slede
+četiri grupe bottleneck blokova (sa po 3, 4, 6 i 3 bloka), nakon kojih dolaze globalno
+usrednjavanje i potpuno povezan klasifikacioni sloj. ResNet-50 ima oko 25 miliona
+parametara i predstavlja standardnu, dobro proučenu osnovicu za zadatke klasifikacije
+slika.
+
+\subsubsection{Vizuelni transformer (ViT)}
+\label{sec:vit}
+
 Vizuelni transformer (engl.\ \textit{Vision Transformer}, ViT)~\cite{dosovitskiy2021vit}
-primenjuje arhitekturu transformera, izvorno razvijenu za obradu prirodnog jezika, na
-slike. Ulazna slika se deli na mrežu nepreklapajućih isečaka (engl.\ \textit{patches})
-veličine $16\times16$ piksela; svaki isečak se linearno projektuje u vektor (token), a
-dodaju mu se i pozicione informacije (engl.\ \textit{positional embedding}). Niz tokena,
-zajedno sa posebnim klasifikacionim tokenom \texttt{[CLS]}, prolazi kroz slojeve
-samopažnje (engl.\ \textit{multi-head self-attention}), koji za razliku od konvolucija
-modeluju \textit{globalne} zavisnosti između svih delova slike već u prvom sloju. Konačna
-klasifikacija se izvodi iz reprezentacije \texttt{[CLS]} tokena. Pošto transformeri nemaju
-ugrađenu induktivnu pristrasnost konvolucija (lokalnost, translatorna invarijantnost),
-za dobre rezultate na malim skupovima podataka po pravilu je neophodno
-\textit{predtreniranje} na velikim skupovima. U ovom radu koristi se varijanta
-ViT-Base/16, predtrenirana na skupu ImageNet-21k, koja se zatim fino podešava (engl.\
-\textit{fine-tuning}) na našem zadatku.
+prenosi arhitekturu \textit{transformera}, izvorno razvijenu za obradu prirodnog jezika,
+na domen slika. Ulazna slika se najpre deli na mrežu nepreklapajućih isečaka (engl.\
+\textit{patches}) veličine $16\times16$ piksela; svaki isečak se ,,izravna'' i linearnom
+projekcijom preslikava u vektor fiksne dimenzije (token, engl.\ \textit{patch embedding}).
+Tako se dvodimenzionalna slika pretvara u \textit{niz} tokena. Na početak niza dodaje se
+poseban, naučivi klasifikacioni token \texttt{[CLS]}, a svakom tokenu se pridodaje i
+\textbf{pozicioni embeding} (engl.\ \textit{positional embedding}), pošto sam mehanizam
+pažnje ne sadrži informaciju o redosledu.
+
+Niz tokena prolazi kroz \textbf{enkoder transformera} --- stek identičnih slojeva od kojih
+svaki sadrži višeglavu samopažnju (engl.\ \textit{multi-head self-attention}, MHSA) i
+potpuno povezanu mrežu (MLP), uz normalizaciju slojeva (engl.\ \textit{layer norm}) i
+rezidualne veze. Srž mehanizma je \textbf{samopažnja}: iz svakog tokena izvode se vektori
+upita $Q$ (engl.\ \textit{query}), ključa $K$ (engl.\ \textit{key}) i vrednosti $V$
+(engl.\ \textit{value}), a izlaz se računa kao
+\begin{equation}
+\mathrm{Attention}(Q,K,V) = \mathrm{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}}\right)V,
+\label{eq:attention}
+\end{equation}
+gde je $d_k$ dimenzija ključeva. Na taj način svaki token može da ,,obrati pažnju'' na sve
+ostale tokene i tako modeluje \textbf{globalne} zavisnosti između udaljenih delova slike
+već u prvom sloju --- za razliku od konvolucija, koje su inherentno lokalne. Više
+paralelnih ,,glava'' pažnje uči različite tipove odnosa. Konačna klasifikacija se izvodi iz
+reprezentacije \texttt{[CLS]} tokena na izlazu enkodera, propuštanjem kroz mali MLP.
+Varijanta \textbf{ViT-Base/16} (isečci $16\times16$) ima 12 slojeva enkodera, skrivenu
+dimenziju 768, 12 glava pažnje i oko 86 miliona parametara.
+
+Pošto transformeri nemaju ugrađenu induktivnu pristrasnost konvolucija (lokalnost i
+translatornu ekvivarijantnost), oni po pravilu \textit{slabo generalizuju} kada se treniraju
+od nule na malim skupovima podataka i zahtevaju \textbf{predtreniranje} na velikim skupovima.
+Zbog toga se u ovom radu ViT-Base/16 ne trenira od nule, već se polazi od težina
+predtreniranih na skupu ImageNet-21k i potom fino podešava (engl.\ \textit{fine-tuning}) na
+našem zadatku.
 
 \paragraph{Augmentacija podataka.}
 Radi smanjenja preprilagođavanja (engl.\ \textit{overfitting}) na trening skup, tokom
@@ -373,13 +421,37 @@ Korišćen je javno dostupan skup podataka \textit{Lumbar Spinal MRI
 Dataset}~\cite{khan2023dataset}, dostupan na platformi Kaggle na adresi:\\
 \url{https://www.kaggle.com/datasets/abdullahkhan70/lumbar-spinal-mri-dataset}.
 
-Skup sadrži aksijalne MRI preseke lumbalne kičme organizovane u tri originalne
-kategorije: \textit{Herniated Disc} (hernija diska), \textit{No Stenosis} (uredan nalaz,
-bez stenoze) i \textit{Thecal Sac}. U ovom radu klasa \textit{Thecal Sac} je izostavljena
-jer ne predstavlja dijagnostičku kategoriju uporedivu sa preostale dve, te je problem
-sveden na \textbf{binarnu klasifikaciju} (hernija diska naspram urednog nalaza). Podaci
-su unapred podeljeni u \texttt{train} i \texttt{test} foldere; raspodela broja snimaka po
-klasama data je u tabeli~\ref{tab:baza}.
+\paragraph{Sadržaj i format.}
+Skup se sastoji od \textbf{aksijalnih (transverzalnih) preseka} MRI snimaka lumbalne
+kičme, tj.\ preseka u ravni okomitoj na osu kičme, na nivou intervertebralnih diskova
+donjeg dela lumbalne kičme. Aksijalna ravan je za ovaj zadatak posebno informativna jer se
+na njoj jasno vide intervertebralni disk, duralna (tekalna) vreća i nervni koreni, kao i
+njihov međusobni odnos~\cite{hou2023mri}. Svaka slika je u \texttt{JPEG} formatu,
+rezolucije $400\times400$ piksela, zapisana kao trokanalna (RGB) slika iako je sam MRI
+sadržaj u nijansama sive. Slike su već anonimizovane i isečene na region od interesa, bez
+pratećih meta-podataka o pacijentu.
+
+\paragraph{Klase.}
+Snimci su organizovani u tri originalne kategorije, prema dominantnom nalazu na preseku:
+\begin{itemize}
+  \item \textbf{Herniated Disc} (hernija diska) --- presek na kome materijal
+        intervertebralnog diska probija fibrozni prsten i prodire u spinalni kanal,
+        potencijalno pritiskajući nervne strukture; to je patološki nalaz koji se dovodi u
+        vezu sa bolom u leđima i nozi.
+  \item \textbf{No Stenosis} (uredan nalaz) --- presek bez suženja spinalnog kanala i bez
+        znakova hernije; služi kao ,,negativna'' (zdrava) klasa.
+  \item \textbf{Thecal Sac} (tekalna/duralna vreća) --- presek na kome je u fokusu duralna
+        vreća (membranska struktura ispunjena likvorom koja obavija nervne korene). Ova
+        kategorija ne predstavlja dijagnozu uporedivu sa preostale dve, već pre tip prikaza
+        anatomske strukture.
+\end{itemize}
+U ovom radu klasa \textit{Thecal Sac} je \textbf{izostavljena} jer nije dijagnostički
+uporediva sa preostale dve i unela bi nejasnu, heterogenu kategoriju u problem; time je
+zadatak sveden na \textbf{binarnu klasifikaciju} (hernija diska naspram urednog nalaza),
+što je u skladu i sa formulacijom problema u literaturi~\cite{hou2023mri}. Podaci su od
+strane autora skupa unapred podeljeni u \texttt{train} i \texttt{test} foldere; raspodela
+broja snimaka po klasama (nakon izostavljanja \textit{Thecal Sac}) data je u
+tabeli~\ref{tab:baza}.
 
 \begin{table}[H]
 \centering
@@ -462,19 +534,27 @@ za klasifikaciju (nad \texttt{[CLS]} tokenom) prilagođena je broju klasa (dve).
 \label{sec:trening}
 
 Treniranje je izvedeno na iznajmljenom grafičkom procesoru \textbf{NVIDIA RTX 4090
-(24\,GB)} preko platforme \textit{vast.ai}. Korišćeni hiperparametri za oba modela
-sumirani su u tabeli~\ref{tab:hiperparametri}. Optimizacija se vrši algoritmom
+(24\,GB)} preko platforme \textit{vast.ai}. Obe arhitekture treniraju se istom skriptom,
+u kojoj se izborom parametra \texttt{MODEL\_TYPE} (\texttt{"resnet50"} ili \texttt{"vit"})
+automatski biraju odgovarajući model i hiperparametri. Korišćeni hiperparametri za oba
+modela sumirani su u tabeli~\ref{tab:hiperparametri}. Optimizacija se vrši algoritmom
 Adam~\cite{kingma2015adam} za ResNet-50, odnosno AdamW~\cite{loshchilov2019adamw} za ViT,
 uz kosinusno opadanje stope učenja~\cite{loshchilov2017sgdr} tokom svih epoha. Radi
 stabilnosti treniranja primenjeno je odsecanje norme gradijenta (engl.\ \textit{gradient
 clipping}) na vrednost $1{,}0$, a tokom treniranja praćena je i prosečna norma gradijenta
-po epohi. Tok treniranja praćen je pomoću alata Weights \& Biases (\textit{wandb}); javno
-dostupni izveštaji o treniranju mogu se pogledati na sledećim adresama:
+po epohi.
+
+Treniranje se odvija do unapred zadatog budžeta epoha, pri čemu se \textbf{čuva model sa
+najboljom tačnošću na validacionom skupu} (što efektivno deluje kao rano zaustavljanje);
+dodatno se na svakih $15$ minuta snima međučekpoint radi otpornosti na prekide. Tok
+treniranja praćen je pomoću alata Weights \& Biases (\textit{wandb}); za konvolucioni model
+se periodično (na svake dve epohe) u \textit{wandb} beleže i Grad-CAM vizuelizacije radi
+praćenja na šta model obraća pažnju tokom učenja. Javno dostupni izveštaji o treniranju mogu
+se pogledati na sledećim adresama:
 \begin{itemize}
   \item ResNet-50: \url{[wandb-link-resnet]}
   \item ViT-Base/16: \url{[wandb-link-vit]}
 \end{itemize}
-Model sa najboljom tačnošću na validacionom skupu čuva se kao finalni model.
 
 \begin{table}[H]
 \centering
@@ -486,10 +566,10 @@ Model sa najboljom tačnošću na validacionom skupu čuva se kao finalni model.
 \midrule
 Inicijalizacija        & od nule                 & ImageNet-21k (pretreniran) \\
 Ulazna rezolucija      & $224\times224$          & $224\times224$ \\
-Broj epoha             & 20                      & 20 \\
+Broj epoha (budžet)    & do 2000$^{*}$           & do 2000$^{*}$ \\
 Veličina batch-a       & 128                     & 128 \\
 Optimizator            & Adam                    & AdamW \\
-Početna stopa učenja   & $5\times10^{-4}$        & $2\times10^{-4}$ \\
+Početna stopa učenja   & $5\times10^{-4}$        & $1\times10^{-4}$ \\
 Raspored stope učenja  & Cosine annealing        & Cosine annealing \\
 Weight decay ($L_2$)   & $1\times10^{-3}$        & $1\times10^{-2}$ \\
 Dropout (glava)        & $0{,}5$                 & ugrađen u arhitekturu \\
@@ -499,6 +579,10 @@ Gradient clipping      & $1{,}0$                 & $1{,}0$ \\
 Seed                   & 42                      & 42 \\
 \bottomrule
 \end{tabular}
+
+\vspace{2pt}
+{\footnotesize $^{*}$ Treniranje ide do zadatog budžeta epoha, ali se čuva model sa
+najboljom validacionom tačnošću (efektivno rano zaustavljanje).}
 \end{table}
 
 \subsection{Evaluacija i metrike}
@@ -545,8 +629,8 @@ gradijenta po epohi za trening i validacioni skup.}
 \begin{figure}[H]
 \centering
 \placeholderbox{4.5cm}{Krive treniranja modela ViT-Base/16 (gubitak, tačnost, norma
-gradijenta). Generiše se pokretanjem \texttt{train\_vit.py} (datoteka
-\texttt{best\_model\_vit\_curves.png}); videti uputstvo za reprodukciju.}
+gradijenta). Generiše se pokretanjem \texttt{train.py} sa \texttt{MODEL\_TYPE="vit"}
+(datoteka \texttt{best\_model\_vit\_curves.png}); videti uputstvo za reprodukciju.}
 \caption{Krive treniranja modela \textbf{ViT-Base/16}.}
 \label{fig:krive-vit}
 \end{figure}

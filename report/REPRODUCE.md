@@ -24,15 +24,17 @@
 ## 1. Treniranje (već implementirano) — DVE arhitekture
 
 U izveštaju se porede dva modela: **ResNet-50** (od nule) i **ViT-Base/16**
-(pretreniran na ImageNet-21k, fino podešen). Svaki ima svoju skriptu.
+(pretreniran na ImageNet-21k, fino podešen). Oba se treniraju **istom skriptom**
+`train.py` — model se bira parametrom `MODEL_TYPE` na vrhu fajla
+(`"resnet50"` ili `"vit"`), a hiperparametri (LR, weight decay, optimizator,
+putanje) se automatski biraju u `_MODEL_CFG`. (Raniji zaseban `train_vit.py`
+je obrisan i objedinjen u `train.py`.)
 
 ### 1a. ResNet-50
-Konfiguracija je na vrhu `train.py` (sekcija `CONFIG`). Pokretanje:
-
 ```bash
+# u train.py postaviti: MODEL_TYPE = "resnet50"
 python3 train.py
 ```
-
 Rezultat:
 - `best_model_resnet50.pth` — težine sa najboljom tačnošću na validaciji.
 - `best_model_resnet50_curves.png` — krive treniranja. **Ovo je Slika 3**
@@ -42,13 +44,12 @@ Rezultat:
   ```
 
 ### 1b. ViT-Base/16
-Zahteva `timm`. Konfiguracija na vrhu `train_vit.py`. Pokretanje:
-
+Zahteva `timm` (AdamW, LR=1e-4, weight_decay=1e-2, pretrained=True).
 ```bash
 pip install timm
-python3 train_vit.py
+# u train.py postaviti: MODEL_TYPE = "vit"
+python3 train.py
 ```
-
 Rezultat:
 - `best_model_vit.pth` — težine ViT modela.
 - `best_model_vit_curves.png` — krive treniranja. **Ovo je Slika 4**
@@ -60,11 +61,15 @@ Rezultat:
   `\includegraphics[width=\linewidth]{figures/vit_curves.png}`.
 
 > Napomene:
+> - Treniranje ide do budžeta `EPOCHS`, ali se čuva model sa najboljom
+>   validacionom tačnošću (efektivno rano zaustavljanje) + međučekpoint na
+>   `CKPT_INTERVAL` sekundi. Tok se loguje u **wandb** (`WANDB_PROJECT`), a za
+>   ResNet se na `GRADCAM_INTERVAL` epoha loguju i Grad-CAM slike.
 > - ViT **ne podržava Grad-CAM** (nema prostorne mape obeležja). Grad-CAM se
->   radi samo na ResNet-u (`gradcam_viz.py`). Za interpretaciju ViT-a koristiti
->   attention rollout (budući rad).
-> - U `train.py` poziv `save_gradcam(...)` je iza `return` u `main()` (mrtav
->   kôd); Grad-CAM se generiše zasebnom skriptom `gradcam_viz.py`.
+>   radi samo na ResNet-u (`gradcam_viz.py`); za ViT koristiti attention
+>   rollout (budući rad).
+> - wandb linkovi runova (`[wandb-link-resnet]`, `[wandb-link-vit]`) ubacuju se
+>   u `main.tex`, odeljak Treniranje.
 
 ## 2. Grad-CAM slike (već implementirano)
 
