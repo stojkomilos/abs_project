@@ -1,6 +1,6 @@
 """
 Lumbar Spine MRI — training entry point.
-Press F5 / run this file. Edit the globals below to change behaviour.
+Change MODEL_TYPE below to switch between models, then run:  python3 train.py
 """
 
 import copy
@@ -19,29 +19,41 @@ import torch.optim as optim
 import wandb
 
 from dataset import make_loaders, IMG_MEAN, IMG_STD
-from model import build_model, save_gradcam, GradCAM
+from model import build_model, build_vit, save_gradcam, GradCAM
 
 # ---------------------------------------------------------------------------
 # CONFIG — edit these
 # ---------------------------------------------------------------------------
-DATA_ROOT         = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
-EPOCHS            = 20
-BATCH             = 128
-LR                = 5e-4
-IMG_SIZE          = 224
-MAX_TRAIN         = None         # None = full dataset
-MAX_VAL           = 128          # None = full val; 0 or -1 = skip val entirely
-PRETRAINED        = False
-OUT_PATH          = "best_model_resnet50.pth"
-INTERMEDIARY_PATH = "best_intermediary_resnet50.pth"
-EXCLUDE_CLASSES   = {"Thecal Sac"}
-GRADCAM_OUT       = "gradcam"
-GRAD_CLIP         = 1.0
-CKPT_INTERVAL     = 900          # seconds between intermediary saves (15 min)
-GRADCAM_INTERVAL  = 2            # epochs between in-training GradCAM logs
-N_GRADCAM_VIZ     = 2            # samples per split (train / val) per GradCAM log
-WANDB_PROJECT     = "lumbar-spine-mri"
-WANDB_ENABLED     = True
+MODEL_TYPE = "resnet50"   # "resnet50" | "vit"
+
+DATA_ROOT        = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
+EPOCHS           = 20
+BATCH            = 128
+IMG_SIZE         = 224
+MAX_TRAIN        = None          # None = full dataset
+MAX_VAL          = 128           # None = full val; 0 or -1 = skip val entirely
+EXCLUDE_CLASSES  = {"Thecal Sac"}
+GRAD_CLIP        = 1.0
+CKPT_INTERVAL    = 900           # seconds between intermediary saves (15 min)
+GRADCAM_INTERVAL = 2             # epochs between GradCAM logs (ResNet only)
+N_GRADCAM_VIZ    = 2             # samples per split per GradCAM log
+WANDB_PROJECT    = "lumbar-spine-mri"
+WANDB_ENABLED    = True
+
+# Per-model hyperparams — auto-selected from MODEL_TYPE, do not edit directly
+_MODEL_CFG = {
+    "resnet50": dict(lr=5e-4, weight_decay=1e-3, pretrained=False,
+                     out_path="best_model_resnet50.pth",
+                     intermediary_path="best_intermediary_resnet50.pth"),
+    "vit":      dict(lr=2e-4, weight_decay=1e-2, pretrained=True,
+                     out_path="best_model_vit.pth",
+                     intermediary_path="best_intermediary_vit.pth"),
+}
+LR               = _MODEL_CFG[MODEL_TYPE]["lr"]
+WEIGHT_DECAY     = _MODEL_CFG[MODEL_TYPE]["weight_decay"]
+PRETRAINED       = _MODEL_CFG[MODEL_TYPE]["pretrained"]
+OUT_PATH         = _MODEL_CFG[MODEL_TYPE]["out_path"]
+INTERMEDIARY_PATH = _MODEL_CFG[MODEL_TYPE]["intermediary_path"]
 # ---------------------------------------------------------------------------
 
 SEED = 42
@@ -49,7 +61,6 @@ torch.manual_seed(SEED)
 random.seed(SEED)
 np.random.seed(SEED)
 
-# line_profiler: no-op when not running under kernprof
 try:
     profile
 except NameError:
@@ -57,7 +68,7 @@ except NameError:
 
 
 # ---------------------------------------------------------------------------
-# GradCAM helpers
+# GradCAM helpers (ResNet only)
 # ---------------------------------------------------------------------------
 
 def _unnormalize(img_tensor):
@@ -74,48 +85,33 @@ def _cam_overlay(img_np, cam_hw):
 
 
 def _gradcam_log(model, cam_fn, train_ds, val_ds, class_names, device, epoch):
-    """
-    Sample N_GRADCAM_VIZ images from train and val, run GradCAM, and return a
-    wandb log dict with images and timing.  CUDA is synchronised before/after
-    so the wall-clock time is accurate.
-    """
     if torch.cuda.is_available():
         torch.cuda.synchronize()
     t0 = time.time()
 
     log_dict = {}
-    splits = [("train", train_ds)]
-    if val_ds is not None:
-        splits.append(("val", val_ds))
-
-    for split_tag, ds in splits:
-        n = min(N_GRADCAM_VIZ, len(ds))
-        indices = random.sample(range(len(ds)), n)
+    for split_tag, ds in [("train", train_ds)] + ([("val", val_ds)] if val_ds else []):
+        indices = random.sample(range(len(ds)), min(N_GRADCAM_VIZ, len(ds)))
         for j, idx in enumerate(indices):
             img_tensor, label = ds[idx]
-            cam_hw = cam_fn(img_tensor)
-            img_np = _unnormalize(img_tensor)
+            cam_hw  = cam_fn(img_tensor)
+            img_np  = _unnormalize(img_tensor)
             cam_up, overlay = _cam_overlay(img_np, cam_hw)
-
             with torch.no_grad():
                 pred = model(img_tensor.unsqueeze(0).to(device)).argmax(1).item()
-
-            true_name = class_names[label]
-            pred_name = class_names[pred]
-            correct   = label == pred
+            true_name, pred_name = class_names[label], class_names[pred]
+            correct = label == pred
 
             fig, axes = plt.subplots(1, 3, figsize=(12, 4))
             axes[0].imshow(img_np);             axes[0].set_title("Input");    axes[0].axis("off")
             axes[1].imshow(cam_up, cmap="jet"); axes[1].set_title("GradCAM"); axes[1].axis("off")
             axes[2].imshow(overlay)
-            axes[2].set_title(
-                f"true: {true_name}  pred: {pred_name}  {'OK' if correct else 'WRONG'}")
+            axes[2].set_title(f"true: {true_name}  pred: {pred_name}  {'OK' if correct else 'WRONG'}")
             axes[2].axis("off")
             plt.suptitle(f"ep {epoch} | {split_tag} sample {j}", fontsize=9)
             plt.tight_layout()
-
-            caption = f"true:{true_name} pred:{pred_name} {'OK' if correct else 'WRONG'}"
-            log_dict[f"gradcam/{split_tag}_{j}"] = wandb.Image(fig, caption=caption)
+            log_dict[f"gradcam/{split_tag}_{j}"] = wandb.Image(
+                fig, caption=f"true:{true_name} pred:{pred_name} {'OK' if correct else 'WRONG'}")
             plt.close(fig)
 
     if torch.cuda.is_available():
@@ -139,14 +135,14 @@ def train_one_epoch(model, loader, criterion, optimizer, device, epoch):
     for step, (imgs, labels) in enumerate(loader):
         imgs, labels = imgs.to(device), labels.to(device)
         optimizer.zero_grad()
-        out = model(imgs)
+        out  = model(imgs)
         loss = criterion(out, labels)
         loss.backward()
         gnorm = nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP).item()
         optimizer.step()
-        loss_sum += loss.item() * imgs.size(0)
-        correct  += (out.argmax(1) == labels).sum().item()
-        total    += imgs.size(0)
+        loss_sum  += loss.item() * imgs.size(0)
+        correct   += (out.argmax(1) == labels).sum().item()
+        total     += imgs.size(0)
         gnorm_sum += gnorm
         print(f"  ep {epoch:3d} step {step:4d} | loss {loss.item():.4f} | grad_norm {gnorm:.4f}")
     return loss_sum / total, correct / total, gnorm_sum / (step + 1)
@@ -158,7 +154,7 @@ def evaluate(model, loader, criterion, device):
     loss_sum = correct = total = 0
     for imgs, labels in loader:
         imgs, labels = imgs.to(device), labels.to(device)
-        out = model(imgs)
+        out  = model(imgs)
         loss = criterion(out, labels)
         loss_sum += loss.item() * imgs.size(0)
         correct  += (out.argmax(1) == labels).sum().item()
@@ -174,43 +170,44 @@ def main():
         torch.device("cuda") if torch.cuda.is_available() else
         torch.device("cpu")
     )
-    print(f"Device  : {device}\n")
+    print(f"Device     : {device}")
+    print(f"Model type : {MODEL_TYPE}\n")
 
     train_loader, val_loader, train_ds, class_names, class_weights = make_loaders(
-        data_root=DATA_ROOT,
-        batch_size=BATCH,
-        exclude_classes=EXCLUDE_CLASSES,
-        max_train=MAX_TRAIN,
-        max_val=MAX_VAL,
-        img_size=IMG_SIZE,
-        seed=SEED,
+        data_root=DATA_ROOT, batch_size=BATCH, exclude_classes=EXCLUDE_CLASSES,
+        max_train=MAX_TRAIN, max_val=MAX_VAL, img_size=IMG_SIZE, seed=SEED,
     )
 
-    model     = build_model(len(class_names), pretrained=PRETRAINED).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-3)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
+    if MODEL_TYPE == "resnet50":
+        model     = build_model(len(class_names), pretrained=PRETRAINED).to(device)
+        optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+        cam_fn    = GradCAM(model)
+    else:
+        model     = build_vit(len(class_names), pretrained=PRETRAINED).to(device)
+        optimizer = optim.AdamW(model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+        cam_fn    = None   # ViT does not support GradCAM
 
-    cam_fn  = GradCAM(model)
-    val_ds  = val_loader.dataset if val_loader is not None else None
+    criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
+    val_ds    = val_loader.dataset if val_loader is not None else None
 
     if WANDB_ENABLED:
         try:
             wandb.init(
                 project=WANDB_PROJECT,
-                job_type="resnet50",
-                tags=["resnet50"],
+                job_type=MODEL_TYPE,
+                tags=[MODEL_TYPE],
                 config=dict(
-                    model="resnet50", epochs=EPOCHS, batch=BATCH, lr=LR,
+                    model=MODEL_TYPE, epochs=EPOCHS, batch=BATCH, lr=LR,
                     img_size=IMG_SIZE, pretrained=PRETRAINED, grad_clip=GRAD_CLIP,
-                    weight_decay=1e-3, max_train=MAX_TRAIN, max_val=MAX_VAL,
+                    weight_decay=WEIGHT_DECAY, max_train=MAX_TRAIN, max_val=MAX_VAL,
                 ),
             )
-            wandb.run.name = f"resnet50-{wandb.run.name}"
+            wandb.run.name = f"{MODEL_TYPE}-{wandb.run.name}"
             wandb.run.save()
             import webbrowser
             webbrowser.open(wandb.run.url)
-            print(f"[wandb] run url: {wandb.run.url}")
+            print(f"[wandb] {wandb.run.name}  {wandb.run.url}")
         except Exception as e:
             print(f"[wandb] init failed ({e}) — continuing without wandb")
             globals()["WANDB_ENABLED"] = False
@@ -232,12 +229,9 @@ def main():
         wandb.finish()
 
     torch.save(best_weights, OUT_PATH)
-    if no_val:
-        print(f"\nSaved final weights to {OUT_PATH}")
-    else:
-        print(f"\nBest val acc : {best_val_acc:.4f}  — saved to {OUT_PATH}")
+    print(f"\nBest val acc : {best_val_acc:.4f}  — saved to {OUT_PATH}" if not no_val
+          else f"\nSaved final weights to {OUT_PATH}")
 
-    # Learning curves
     epochs_x = range(1, len(history["tr_loss"]) + 1)
     fig, axes = plt.subplots(1, 3, figsize=(18, 4))
     axes[0].plot(epochs_x, history["tr_loss"], label="Train")
@@ -257,18 +251,18 @@ def main():
 
     return
 
-    # GradCAM (full run — currently disabled)
+    # GradCAM full run (currently disabled — use gradcam_viz.py instead)
     model.load_state_dict(best_weights)
-    save_gradcam(model, train_ds, class_names, GRADCAM_OUT, device)
+    save_gradcam(model, train_ds, class_names, "gradcam", device)
 
 
 @profile
 def training_loop(model, train_loader, val_loader, criterion, optimizer, scheduler,
                   history, no_val, device, cam_fn, train_ds, val_ds, class_names):
-    best_val_acc        = 0.0
-    best_weights        = None
+    best_val_acc           = 0.0
+    best_weights           = None
     best_intermediary_loss = float('inf')
-    last_ckpt_time      = time.time()
+    last_ckpt_time         = time.time()
 
     for epoch in range(1, EPOCHS + 1):
         t0 = time.time()
@@ -304,11 +298,8 @@ def training_loop(model, train_loader, val_loader, criterion, optimizer, schedul
                 print(f"  [ckpt] intermediary checkpoint saved to {INTERMEDIARY_PATH}"
                       f" (val_loss={vl_loss:.4f}, ep={epoch})")
 
-        # Periodic GradCAM visualisation
-        if epoch % GRADCAM_INTERVAL == 0:
-            viz_log = _gradcam_log(
-                model, cam_fn, train_ds, val_ds, class_names, device, epoch)
-            log.update(viz_log)
+        if cam_fn is not None and epoch % GRADCAM_INTERVAL == 0:
+            log.update(_gradcam_log(model, cam_fn, train_ds, val_ds, class_names, device, epoch))
 
         if WANDB_ENABLED:
             wandb.log(log)
