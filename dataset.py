@@ -11,8 +11,21 @@ IMG_STD  = [0.229, 0.224, 0.225]
 
 
 def get_transform(img_size: int = 224) -> transforms.Compose:
+    """Val/test transform — deterministic."""
     return transforms.Compose([
         transforms.Resize((img_size, img_size)),
+        transforms.ToTensor(),
+        transforms.Normalize(IMG_MEAN, IMG_STD),
+    ])
+
+
+def get_train_transform(img_size: int = 224) -> transforms.Compose:
+    """Train transform — with augmentation."""
+    return transforms.Compose([
+        transforms.RandomResizedCrop(img_size, scale=(0.8, 1.0)),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomRotation(degrees=10),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2),
         transforms.ToTensor(),
         transforms.Normalize(IMG_MEAN, IMG_STD),
     ])
@@ -49,7 +62,8 @@ def make_loaders(
     """
     no_val = max_val is not None and max_val <= 0
     root = Path(data_root)
-    tf = get_transform(img_size)
+    tf       = get_transform(img_size)
+    train_tf = get_train_transform(img_size)
 
     src_train = datasets.ImageFolder(str(root / "train"))
     src_test  = datasets.ImageFolder(str(root / "test"))
@@ -83,7 +97,7 @@ def make_loaders(
 
     pin = torch.cuda.is_available()
 
-    train_ds = Subset(datasets.ImageFolder(str(root / "train"), transform=tf), idx_train)
+    train_ds = Subset(datasets.ImageFolder(str(root / "train"), transform=train_tf), idx_train)
     train_loader = DataLoader(
         train_ds,
         batch_size=min(batch_size, len(idx_train)), shuffle=True, num_workers=8, pin_memory=pin)

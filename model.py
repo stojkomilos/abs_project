@@ -15,7 +15,7 @@ def build_model(num_classes: int, pretrained: bool = False) -> nn.Module:
     weights = models.ResNet50_Weights.DEFAULT if pretrained else None
     model = models.resnet50(weights=weights)
     model.fc = nn.Sequential(
-        nn.Dropout(0.3),
+        nn.Dropout(0.5),
         nn.Linear(model.fc.in_features, num_classes),
     )
     return model

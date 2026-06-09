@@ -25,7 +25,7 @@ from model import build_model, save_gradcam, GradCAM
 # CONFIG — edit these
 # ---------------------------------------------------------------------------
 DATA_ROOT         = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
-EPOCHS            = 50
+EPOCHS            = 20
 BATCH             = 128
 LR                = 5e-4
 IMG_SIZE          = 224
@@ -188,7 +188,7 @@ def main():
 
     model     = build_model(len(class_names), pretrained=PRETRAINED).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
+    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
     cam_fn  = GradCAM(model)
@@ -201,7 +201,7 @@ def main():
                 config=dict(
                     epochs=EPOCHS, batch=BATCH, lr=LR, img_size=IMG_SIZE,
                     pretrained=PRETRAINED, grad_clip=GRAD_CLIP,
-                    weight_decay=5e-4, max_train=MAX_TRAIN, max_val=MAX_VAL,
+                    weight_decay=1e-3, max_train=MAX_TRAIN, max_val=MAX_VAL,
                 ),
             )
             import webbrowser
