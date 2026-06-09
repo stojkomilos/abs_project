@@ -47,7 +47,7 @@ _MODEL_CFG = {
     "resnet50": dict(lr=5e-4, weight_decay=1e-3, pretrained=False,
                      out_path="best_model_resnet50.pth",
                      intermediary_path="best_intermediary_resnet50.pth"),
-    "vit":      dict(lr=2e-4, weight_decay=1e-2, pretrained=True,
+    "vit":      dict(lr=1e-4, weight_decay=1e-2, pretrained=True,
                      out_path="best_model_vit.pth",
                      intermediary_path="best_intermediary_vit.pth"),
 }
