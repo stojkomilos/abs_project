@@ -21,7 +21,7 @@ from dataset import get_transform, IMG_MEAN, IMG_STD
 # CONFIG
 # ---------------------------------------------------------------------------
 DATA_ROOT       = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
-MODEL_PATH      = "best_model.pth"
+MODEL_PATH      = "first_big_run_best_model.pth"
 N_TRAIN         = 8        # images sampled from train folder
 N_VAL           = 8        # images sampled from test folder
 OUT_DIR         = "gradcam_viz"
@@ -141,7 +141,9 @@ def main():
     state = torch.load(MODEL_PATH, map_location=device)
     model.load_state_dict(state)
     model.eval()
-    print(f"Loaded model from {MODEL_PATH}\n")
+    banner = f"  MODEL: {MODEL_PATH}  "
+    bar = "=" * len(banner)
+    print(f"\n{bar}\n{banner}\n{bar}\n")
 
     Path(OUT_DIR).mkdir(exist_ok=True)
     cam_fn = GradCAM(model)
