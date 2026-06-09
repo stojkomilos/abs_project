@@ -22,17 +22,20 @@ from model import build_model, save_gradcam
 # ---------------------------------------------------------------------------
 # CONFIG — edit these
 # ---------------------------------------------------------------------------
-DATA_ROOT       = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
-EPOCHS          = 2
-BATCH           = 2
-LR              = 1e-2
-IMG_SIZE        = 224
-MAX_TRAIN       = 2       # None = full dataset
-MAX_VAL         = 0       # None = full val; 0 or -1 = skip val entirely
-PRETRAINED      = False
-OUT_PATH        = "best_model.pth"
-EXCLUDE_CLASSES = {"Thecal Sac"}
-GRADCAM_OUT     = "gradcam"
+DATA_ROOT        = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
+EPOCHS           = 200
+BATCH            = 128
+LR               = 5e-4
+IMG_SIZE         = 224
+MAX_TRAIN        = None          # None = full dataset
+MAX_VAL          = 128           # None = full val; 0 or -1 = skip val entirely
+PRETRAINED       = False
+OUT_PATH         = "best_model.pth"
+INTERMEDIARY_PATH = "best_intermediary.pth"
+EXCLUDE_CLASSES  = {"Thecal Sac"}
+GRADCAM_OUT      = "gradcam"
+GRAD_CLIP        = 1.0
+CKPT_INTERVAL    = 900           # seconds between intermediary saves (15 min)
 # ---------------------------------------------------------------------------
 
 SEED = 42
@@ -47,31 +50,25 @@ except NameError:
     def profile(f): return f
 
 
-def grad_norm(model):
-    total = 0.0
-    for p in model.parameters():
-        if p.grad is not None:
-            total += p.grad.detach().norm(2).item() ** 2
-    return total ** 0.5
-
-
 @profile
 def train_one_epoch(model, loader, criterion, optimizer, device, epoch):
     model.train()
     loss_sum = correct = total = 0
+    gnorm_sum = 0.0
     for step, (imgs, labels) in enumerate(loader):
         imgs, labels = imgs.to(device), labels.to(device)
         optimizer.zero_grad()
         out = model(imgs)
         loss = criterion(out, labels)
         loss.backward()
-        gnorm = grad_norm(model)
+        gnorm = nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP).item()
         optimizer.step()
         loss_sum += loss.item() * imgs.size(0)
         correct  += (out.argmax(1) == labels).sum().item()
         total    += imgs.size(0)
+        gnorm_sum += gnorm
         print(f"  ep {epoch:3d} step {step:4d} | loss {loss.item():.4f} | grad_norm {gnorm:.4f}")
-    return loss_sum / total, correct / total
+    return loss_sum / total, correct / total, gnorm_sum / (step + 1)
 
 
 @torch.no_grad()
@@ -110,10 +107,10 @@ def main():
 
     model     = build_model(len(class_names), pretrained=PRETRAINED).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
-    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=0.0)
+    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=5e-4)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=EPOCHS)
 
-    history = {"tr_loss": [], "tr_acc": [], "vl_loss": [], "vl_acc": []}
+    history = {"tr_loss": [], "tr_acc": [], "tr_gnorm": [], "vl_loss": [], "vl_acc": []}
 
     if no_val:
         print(f"\n{'Ep':>3}  {'TrLoss':>7}  {'TrAcc':>6}  {'s':>5}")
@@ -134,22 +131,23 @@ def main():
 
     # Learning curves
     epochs_x = range(1, EPOCHS + 1)
-    n_plots = 1 if no_val else 2
-    fig, axes = plt.subplots(1, n_plots, figsize=(6 * n_plots, 4))
-    if no_val:
-        axes = [axes]
+    fig, axes = plt.subplots(1, 3, figsize=(18, 4))
     axes[0].plot(epochs_x, history["tr_loss"], label="Train")
     if not no_val:
         axes[0].plot(epochs_x, history["vl_loss"], label="Val")
     axes[0].set_title("Loss"); axes[0].set_xlabel("Epoch"); axes[0].legend()
+    axes[1].plot(epochs_x, history["tr_acc"], label="Train")
     if not no_val:
-        axes[1].plot(epochs_x, history["tr_acc"], label="Train")
         axes[1].plot(epochs_x, history["vl_acc"], label="Val")
-        axes[1].set_title("Accuracy"); axes[1].set_xlabel("Epoch"); axes[1].legend()
+    axes[1].set_title("Accuracy"); axes[1].set_xlabel("Epoch"); axes[1].legend()
+    axes[2].plot(epochs_x, history["tr_gnorm"], label="Train")
+    axes[2].set_title("Grad Norm (mean/epoch)"); axes[2].set_xlabel("Epoch"); axes[2].legend()
     plt.tight_layout()
     curve_path = OUT_PATH.replace(".pth", "_curves.png")
     plt.savefig(curve_path)
     print(f"Learning curves saved to {curve_path}")
+
+    return
 
     # GradCAM
     model.load_state_dict(best_weights)
@@ -161,16 +159,20 @@ def training_loop(model, train_loader, val_loader, criterion, optimizer, schedul
                   history, no_val, device):
     best_val_acc = 0.0
     best_weights = None
+    best_intermediary_loss = float('inf')
+    last_ckpt_time = time.time()
+
     for epoch in range(1, EPOCHS + 1):
         t0 = time.time()
-        tr_loss, tr_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, epoch)
+        tr_loss, tr_acc, tr_gnorm = train_one_epoch(
+            model, train_loader, criterion, optimizer, device, epoch)
         scheduler.step()
         history["tr_loss"].append(tr_loss)
         history["tr_acc"].append(tr_acc)
+        history["tr_gnorm"].append(tr_gnorm)
 
         if no_val:
             print(f"{epoch:3d}  {tr_loss:7.4f}  {tr_acc:6.4f}  {time.time()-t0:5.1f}s")
-            # best_weights = copy.deepcopy(model.state_dict())
         else:
             vl_loss, vl_acc = evaluate(model, val_loader, criterion, device)
             history["vl_loss"].append(vl_loss)
@@ -181,6 +183,14 @@ def training_loop(model, train_loader, val_loader, criterion, optimizer, schedul
                 best_weights = copy.deepcopy(model.state_dict())
             print(f"{epoch:3d}  {tr_loss:7.4f}  {tr_acc:6.4f}  {vl_loss:7.4f}  {vl_acc:6.4f}  "
                   f"{time.time()-t0:5.1f}s{marker}")
+
+            if time.time() - last_ckpt_time >= CKPT_INTERVAL and vl_loss < best_intermediary_loss:
+                best_intermediary_loss = vl_loss
+                last_ckpt_time = time.time()
+                torch.save(model.state_dict(), INTERMEDIARY_PATH)
+                print(f"  [ckpt] intermediary checkpoint saved to {INTERMEDIARY_PATH}"
+                      f" (val_loss={vl_loss:.4f}, ep={epoch})")
+
     return best_val_acc, best_weights
 
 

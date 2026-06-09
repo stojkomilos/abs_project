@@ -86,7 +86,7 @@ def make_loaders(
     train_ds = Subset(datasets.ImageFolder(str(root / "train"), transform=tf), idx_train)
     train_loader = DataLoader(
         train_ds,
-        batch_size=min(batch_size, len(idx_train)), shuffle=True, num_workers=2, pin_memory=pin)
+        batch_size=min(batch_size, len(idx_train)), shuffle=True, num_workers=8, pin_memory=pin)
 
     val_loader = None
     if not no_val:
@@ -94,7 +94,7 @@ def make_loaders(
             Subset(datasets.ImageFolder(str(root / "train"), transform=tf), idx_val_from_train_capped),
             Subset(datasets.ImageFolder(str(root / "test"),  transform=tf), idx_val_from_test_capped),
         ])
-        val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=2, pin_memory=pin)
+        val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=pin)
 
     train_targets = np.array(src_train.targets)[idx_train]
     train_counts  = {c: int(np.sum(train_targets == src_train.class_to_idx[c])) for c in class_names}
