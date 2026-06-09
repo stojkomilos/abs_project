@@ -25,7 +25,7 @@ from model import build_model, save_gradcam, GradCAM
 # CONFIG — edit these
 # ---------------------------------------------------------------------------
 DATA_ROOT         = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
-EPOCHS            = 200
+EPOCHS            = 50
 BATCH             = 128
 LR                = 5e-4
 IMG_SIZE          = 224
@@ -38,7 +38,7 @@ EXCLUDE_CLASSES   = {"Thecal Sac"}
 GRADCAM_OUT       = "gradcam"
 GRAD_CLIP         = 1.0
 CKPT_INTERVAL     = 900          # seconds between intermediary saves (15 min)
-GRADCAM_INTERVAL  = 180          # seconds between in-training GradCAM logs (3 min)
+GRADCAM_INTERVAL  = 2            # epochs between in-training GradCAM logs
 N_GRADCAM_VIZ     = 2            # samples per split (train / val) per GradCAM log
 WANDB_PROJECT     = "lumbar-spine-mri"
 WANDB_ENABLED     = True
@@ -195,14 +195,21 @@ def main():
     val_ds  = val_loader.dataset if val_loader is not None else None
 
     if WANDB_ENABLED:
-        wandb.init(
-            project=WANDB_PROJECT,
-            config=dict(
-                epochs=EPOCHS, batch=BATCH, lr=LR, img_size=IMG_SIZE,
-                pretrained=PRETRAINED, grad_clip=GRAD_CLIP,
-                weight_decay=5e-4, max_train=MAX_TRAIN, max_val=MAX_VAL,
-            ),
-        )
+        try:
+            wandb.init(
+                project=WANDB_PROJECT,
+                config=dict(
+                    epochs=EPOCHS, batch=BATCH, lr=LR, img_size=IMG_SIZE,
+                    pretrained=PRETRAINED, grad_clip=GRAD_CLIP,
+                    weight_decay=5e-4, max_train=MAX_TRAIN, max_val=MAX_VAL,
+                ),
+            )
+            import webbrowser
+            webbrowser.open(wandb.run.url)
+            print(f"[wandb] run url: {wandb.run.url}")
+        except Exception as e:
+            print(f"[wandb] init failed ({e}) — continuing without wandb")
+            globals()["WANDB_ENABLED"] = False
 
     history = {"tr_loss": [], "tr_acc": [], "tr_gnorm": [], "vl_loss": [], "vl_acc": []}
 
@@ -258,7 +265,6 @@ def training_loop(model, train_loader, val_loader, criterion, optimizer, schedul
     best_weights        = None
     best_intermediary_loss = float('inf')
     last_ckpt_time      = time.time()
-    last_viz_time       = time.time()
 
     for epoch in range(1, EPOCHS + 1):
         t0 = time.time()
@@ -295,8 +301,7 @@ def training_loop(model, train_loader, val_loader, criterion, optimizer, schedul
                       f" (val_loss={vl_loss:.4f}, ep={epoch})")
 
         # Periodic GradCAM visualisation
-        if time.time() - last_viz_time >= GRADCAM_INTERVAL:
-            last_viz_time = time.time()
+        if epoch % GRADCAM_INTERVAL == 0:
             viz_log = _gradcam_log(
                 model, cam_fn, train_ds, val_ds, class_names, device, epoch)
             log.update(viz_log)
