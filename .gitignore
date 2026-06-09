@@ -7,3 +7,6 @@ dataset/
 gradcam/
 *.pdf
 *.ipynb
+onstart.sh
+ports.log
+.vscode/
