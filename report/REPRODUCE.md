@@ -235,14 +235,21 @@ latexmk -c
 Izlaz: `report/main.pdf`.
 
 ### Spisak rezervisanih mesta koja treba popuniti
-- [ ] `Sažetak` — tačnost, senzitivnost, specifičnost najboljeg modela (`[XX,X%]`).
+**Brojevi / linkovi:**
+- [ ] `Sažetak` i `Abstract` — tačnost, senzitivnost, specifičnost najboljeg modela.
 - [ ] Tabela 3 (`tab:rezultati`) — svih 6 metrika, **dve kolone** (ResNet i ViT).
-- [ ] Tabela 4 (`tab:poredjenje`) — redovi "ResNet-50" i "ViT-B/16".
-- [ ] Slika 1 (`fig:primeri`) — `examples.png`.
-- [ ] Slika 4 (`fig:konfuzija`, matrica konfuzije) — `confusion_matrix.png`
-      (najbolji model, ili po jedna za svaki).
-- [ ] Slika `fig:krive-vit` (krive treniranja ViT) — `vit_curves.png`.
-- [ ] Slika `fig:promasaj` — `misclassified.png`.
-- [x] Slika `fig:krive` (ResNet krive) — `learning_curves.png` (već postoji).
-- [x] Slika `fig:gradcam` — `gradcam_summary.png` (već postoji, samo ResNet).
+- [ ] Tabela `tab:poklasa` — rezultati po klasama (preciznost/odziv/F1).
+- [ ] Tabela `tab:poredjenje` — redovi "ResNet-50" i "ViT-B/16".
+- [ ] Odeljak `sec:jedanprimer` — verovatnoće klasa $P(\cdot)$ za izabrani primer.
+- [ ] `[wandb-link-resnet]` i `[wandb-link-vit]` — URL-ovi wandb runova (odeljak Treniranje).
+- [ ] `[github-link]` — URL GitHub repozitorijuma (odeljak Dostupnost koda).
 - [ ] (opciono) `[Ime mentora]` na naslovnoj strani.
+
+**Slike:**
+- [ ] `fig:primeri` — `examples.png` (primeri iz dve klase).
+- [ ] `fig:konfuzija` — `confusion_matrix.png`.
+- [ ] `fig:krive-vit` — `vit_curves.png` (krive treniranja ViT).
+- [ ] `fig:jedanprimer` — montaža međukoraka na jednom primeru (iz `gradcam_viz.py`).
+- [ ] `fig:promasaj` — `misclassified.png`.
+- [x] `fig:krive` — `learning_curves.png` (već postoji).
+- [x] `fig:gradcam` — `gradcam_summary.png` (već postoji, samo ResNet).

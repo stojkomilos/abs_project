@@ -155,6 +155,31 @@ dijagnostike.
 konvolucione neuronske mreže, ResNet, vizuelni transformer (ViT), Grad-CAM,
 računarski potpomognuta dijagnostika.
 
+\vspace{0.6cm}
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+
+Lumbar disc herniation is a common cause of low back pain, and its diagnosis typically
+relies on the examination of Magnetic Resonance Imaging (MRI) scans by an experienced
+radiologist. Because of the high cost of examinations and the uneven distribution of
+medical resources, systems that automatically analyse lumbar spine MRI scans are becoming
+increasingly important. This report presents a system for the automatic classification of
+axial lumbar spine MRI slices into two categories: \textit{disc herniation} and
+\textit{normal finding}. Two architectures are compared: a ResNet-50 convolutional neural
+network trained from scratch, and a ViT-Base/16 vision transformer fine-tuned from weights
+pre-trained on ImageNet-21k. The Grad-CAM method is used to visually interpret the
+decisions of the convolutional model by highlighting the regions of the scan that most
+influenced the prediction. The models were trained and evaluated on a publicly available
+Kaggle dataset, using data augmentation and regularisation. The best model achieves an
+accuracy of [XX.X\%], a sensitivity of [XX.X\%] and a specificity of [XX.X\%] on the test
+set, which is comparable to results reported in the relevant literature. The Grad-CAM maps
+confirm that the convolutional model focuses predominantly on the intervertebral disc and
+thecal sac region, in agreement with clinical diagnostic criteria.
+
+\vspace{0.3cm}
+\noindent\textbf{Keywords:} lumbar disc herniation, MRI, deep learning, convolutional
+neural networks, ResNet, vision transformer (ViT), Grad-CAM, computer-aided diagnosis.
+
 \newpage
 \tableofcontents
 \newpage
@@ -378,6 +403,14 @@ Validacioni skup formiran je objedinjavanjem $15\%$ stratifikovano izdvojenih sn
 \texttt{train} foldera korišćeno za treniranje. Primeri snimaka iz obe klase prikazani su
 na slici~\ref{fig:primeri}.
 
+\paragraph{Napomena o prikupljanju podataka.}
+U ovom projektu nisu vršena sopstvena snimanja niti merenja na ispitanicima --- korišćen
+je isključivo javno dostupan, već prikupljen i anonimizovan skup podataka. Stoga se delovi
+metodologije koji se odnose na opis sistema za snimanje, sprovođenje eksperimenta sa
+ispitanicima i prikupljanje saglasnosti (kao i prateći prilozi) ne primenjuju na ovaj rad;
+za pitanja prikupljanja i etičke saglasnosti merodavan je izvorni autor skupa
+podataka~\cite{khan2023dataset}.
+
 \begin{figure}[H]
 \centering
 \placeholderbox{5cm}{Reprezentativni aksijalni MRI preseci: levo --- hernija diska,
@@ -435,8 +468,13 @@ Adam~\cite{kingma2015adam} za ResNet-50, odnosno AdamW~\cite{loshchilov2019adamw
 uz kosinusno opadanje stope učenja~\cite{loshchilov2017sgdr} tokom svih epoha. Radi
 stabilnosti treniranja primenjeno je odsecanje norme gradijenta (engl.\ \textit{gradient
 clipping}) na vrednost $1{,}0$, a tokom treniranja praćena je i prosečna norma gradijenta
-po epohi. Tok treniranja praćen je pomoću alata Weights \& Biases (\textit{wandb}). Model
-sa najboljom tačnošću na validacionom skupu čuva se kao finalni model.
+po epohi. Tok treniranja praćen je pomoću alata Weights \& Biases (\textit{wandb}); javno
+dostupni izveštaji o treniranju mogu se pogledati na sledećim adresama:
+\begin{itemize}
+  \item ResNet-50: \url{[wandb-link-resnet]}
+  \item ViT-Base/16: \url{[wandb-link-vit]}
+\end{itemize}
+Model sa najboljom tačnošću na validacionom skupu čuva se kao finalni model.
 
 \begin{table}[H]
 \centering
@@ -544,8 +582,57 @@ AUC                       & [0{,}XX]   & [0{,}XX] \\
 \placeholderbox{6cm}{Matrica konfuzije (2$\times$2) na test skupu, sa apsolutnim brojem i
 procentom za svako polje. (Generiše se skriptom za evaluaciju; videti uputstvo za
 reprodukciju.)}
-\caption{Matrica konfuzije na test skupu.}
+\caption{Matrica konfuzije na test skupu (najbolji model).}
 \label{fig:konfuzija}
+\end{figure}
+
+Radi detaljnijeg uvida, u tabeli~\ref{tab:poklasa} dat je sumarni prikaz rezultata
+\textit{po klasama} (preciznost, odziv i F1 mera za svaku od dve klase), čime se vidi da
+li model podjednako dobro prepoznaje obe kategorije ili favorizuje jednu.
+
+\begin{table}[H]
+\centering
+\caption{Sumarni rezultati po klasama na test skupu (najbolji model).}
+\label{tab:poklasa}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Klasa} & \textbf{Preciznost} & \textbf{Odziv} & \textbf{F1} & \textbf{Br. uzoraka} \\
+\midrule
+Hernija diska (Herniated Disc) & [0{,}XX] & [0{,}XX] & [0{,}XX] & 1218 \\
+Uredan nalaz (No Stenosis)     & [0{,}XX] & [0{,}XX] & [0{,}XX] & 1507 \\
+\midrule
+Prosek (\textit{macro})        & [0{,}XX] & [0{,}XX] & [0{,}XX] & 2725 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Detaljan prikaz međukoraka na jednom primeru}
+\label{sec:jedanprimer}
+
+Da bi se ilustrovali međukoraci obrade, na jednom reprezentativnom uzorku (aksijalni
+presek sa hernijom diska) prikazan je ceo put kroz sistem, korak po korak:
+\begin{enumerate}
+  \item \textbf{Ulazni snimak} se učitava i skalira na $224\times224$ piksela
+        (slika~\ref{fig:jedanprimer}, levo).
+  \item \textbf{Pretprocesiranje:} snimak se normalizuje ImageNet statistikama; na test
+        skupu se ne primenjuje augmentacija.
+  \item \textbf{Prolaz kroz mrežu:} model vraća logite, a \textit{softmax} ih pretvara u
+        verovatnoće klasa --- u ovom primeru $P(\text{hernija})=[0{,}XX]$ i
+        $P(\text{uredan})=[0{,}XX]$, te se uzorak klasifikuje kao
+        \textit{hernija diska}.
+  \item \textbf{Grad-CAM:} za predviđenu klasu računa se toplotna mapa značajnosti
+        (slika~\ref{fig:jedanprimer}, sredina), koja se zatim superponira preko ulaznog
+        snimka (slika~\ref{fig:jedanprimer}, desno); aktivacije se koncentrišu u regionu
+        diska, što potvrđuje da je odluka doneta na osnovu anatomski relevantnog regiona.
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\placeholderbox{4.5cm}{Detaljan prikaz na jednom primeru: ulazni snimak, Grad-CAM mapa i
+superpozicija, sa ispisanim verovatnoćama klasa. (Pojedinačne slike već generiše
+\texttt{gradcam\_viz.py}; videti uputstvo za reprodukciju.)}
+\caption{Međukoraci obrade na jednom reprezentativnom primeru.}
+\label{fig:jedanprimer}
 \end{figure}
 
 \subsection{Vizuelizacija pomoću Grad-CAM metode}
@@ -649,6 +736,18 @@ rollout}), pošto Grad-CAM nije primenljiv na transformere; (iii) prelazak sa je
 više susednih aksijalnih preseka, po uzoru na~\cite{hou2023mri}, radi uključivanja
 vertikalne informacije; (iv) proširenje na više klasa (npr.\ stepenovanje težine stenoze)
 i (v) kvantitativna evaluacija kvaliteta toplotnih mapa u saradnji sa radiologom.
+
+\section{Dostupnost koda i podataka}
+\label{sec:dostupnost}
+
+Kompletan izvorni kôd projekta (skripte za pripremu podataka, treniranje obe
+arhitekture, evaluaciju i Grad-CAM vizuelizaciju) javno je dostupan u GitHub
+repozitorijumu na adresi:
+\begin{center}
+\url{[github-link]}
+\end{center}
+Skup podataka je javno dostupan na platformi Kaggle~\cite{khan2023dataset}
+(videti odeljak~\ref{sec:baza}).
 
 % ===========================================================================
 % LITERATURA
