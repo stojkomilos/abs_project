@@ -21,8 +21,12 @@
 - Zavisnosti: `torch`, `torchvision`, `scikit-learn`, `matplotlib`, `numpy`,
   `Pillow`. Dodatno za evaluaciju ispod: `scikit-learn` (već potreban).
 
-## 1. Treniranje (već implementirano)
+## 1. Treniranje (već implementirano) — DVE arhitekture
 
+U izveštaju se porede dva modela: **ResNet-50** (od nule) i **ViT-Base/16**
+(pretreniran na ImageNet-21k, fino podešen). Svaki ima svoju skriptu.
+
+### 1a. ResNet-50
 Konfiguracija je na vrhu `train.py` (sekcija `CONFIG`). Pokretanje:
 
 ```bash
@@ -30,16 +34,37 @@ python3 train.py
 ```
 
 Rezultat:
-- `best_model.pth` — težine modela sa najboljom tačnošću na validaciji.
-- `best_model_curves.png` — krive treniranja (gubitak / tačnost / norma gradijenta).
-  **Ovo je već slika `report/figures/learning_curves.png`** (Slika 3). Ako se
-  ponovo trenira, prekopirati novu verziju:
+- `best_model_resnet50.pth` — težine sa najboljom tačnošću na validaciji.
+- `best_model_resnet50_curves.png` — krive treniranja. **Ovo je Slika 3**
+  (`report/figures/learning_curves.png`). Posle ponovnog treniranja:
   ```bash
-  cp best_model_curves.png report/figures/learning_curves.png
+  cp best_model_resnet50_curves.png report/figures/learning_curves.png
   ```
 
-> Napomena: u `train.py` poziv `save_gradcam(...)` je trenutno iza `return` u
-> `main()` (mrtav kôd). Grad-CAM se generiše zasebnom skriptom `gradcam_viz.py`.
+### 1b. ViT-Base/16
+Zahteva `timm`. Konfiguracija na vrhu `train_vit.py`. Pokretanje:
+
+```bash
+pip install timm
+python3 train_vit.py
+```
+
+Rezultat:
+- `best_model_vit.pth` — težine ViT modela.
+- `best_model_vit_curves.png` — krive treniranja. **Ovo je Slika 4**
+  (`fig:krive-vit`, trenutno placeholder). Posle treniranja:
+  ```bash
+  cp best_model_vit_curves.png report/figures/vit_curves.png
+  ```
+  pa u `main.tex` zameniti placeholder za `fig:krive-vit` sa
+  `\includegraphics[width=\linewidth]{figures/vit_curves.png}`.
+
+> Napomene:
+> - ViT **ne podržava Grad-CAM** (nema prostorne mape obeležja). Grad-CAM se
+>   radi samo na ResNet-u (`gradcam_viz.py`). Za interpretaciju ViT-a koristiti
+>   attention rollout (budući rad).
+> - U `train.py` poziv `save_gradcam(...)` je iza `return` u `main()` (mrtav
+>   kôd); Grad-CAM se generiše zasebnom skriptom `gradcam_viz.py`.
 
 ## 2. Grad-CAM slike (već implementirano)
 
@@ -57,8 +82,14 @@ cp gradcam_viz/summary.png report/figures/gradcam_summary.png
 
 ## 3. Evaluacija + matrica konfuzije + metrike  (TREBA NAPISATI)
 
-Napisati `eval.py` koji učitava `best_model.pth`, prolazi kroz **test** skup
-(ceo, ne uzorkovan), i računa metrike. Pozitivna klasa = `Herniated Disc`.
+Napisati `eval.py` koji učitava model, prolazi kroz **test** skup (ceo, ne
+uzorkovan), i računa metrike. Pozitivna klasa = `Herniated Disc`.
+
+**Pokrenuti za OBA modela** i popuniti po jednu kolonu u Tabeli 3 i po jedan red
+u Tabeli 4:
+- ResNet-50: `MODEL_PATH = "best_model_resnet50.pth"`, `build_model(...)`.
+- ViT-B/16:  `MODEL_PATH = "best_model_vit.pth"`, `build_vit(..., pretrained=False)`
+  (arhitektura se pravi prazna pa se učitava `state_dict`).
 
 Skelet (oslanja se na postojeće module `dataset.py` i `model.py`):
 
@@ -204,12 +235,14 @@ latexmk -c
 Izlaz: `report/main.pdf`.
 
 ### Spisak rezervisanih mesta koja treba popuniti
-- [ ] `Sažetak` — tačnost, senzitivnost, specifičnost (`[XX,X%]`).
-- [ ] Tabela 3 (`tab:rezultati`) — svih 6 metrika.
-- [ ] Tabela 4 (`tab:poredjenje`) — red "Naš model".
+- [ ] `Sažetak` — tačnost, senzitivnost, specifičnost najboljeg modela (`[XX,X%]`).
+- [ ] Tabela 3 (`tab:rezultati`) — svih 6 metrika, **dve kolone** (ResNet i ViT).
+- [ ] Tabela 4 (`tab:poredjenje`) — redovi "ResNet-50" i "ViT-B/16".
 - [ ] Slika 1 (`fig:primeri`) — `examples.png`.
-- [ ] Slika 4 (`fig:konfuzija`) — `confusion_matrix.png`.
-- [ ] Slika 6 (`fig:promasaj`) — `misclassified.png`.
-- [x] Slika 3 (`fig:krive`) — `learning_curves.png` (već postoji).
-- [x] Slika 5 (`fig:gradcam`) — `gradcam_summary.png` (već postoji).
+- [ ] Slika 4 (`fig:konfuzija`, matrica konfuzije) — `confusion_matrix.png`
+      (najbolji model, ili po jedna za svaki).
+- [ ] Slika `fig:krive-vit` (krive treniranja ViT) — `vit_curves.png`.
+- [ ] Slika `fig:promasaj` — `misclassified.png`.
+- [x] Slika `fig:krive` (ResNet krive) — `learning_curves.png` (već postoji).
+- [x] Slika `fig:gradcam` — `gradcam_summary.png` (već postoji, samo ResNet).
 - [ ] (opciono) `[Ime mentora]` na naslovnoj strani.

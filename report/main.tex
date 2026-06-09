@@ -98,8 +98,8 @@ lumbalne kičme na MRI snimcima\\[0.2cm]
 primenom konvolucionih neuronskih mreža\par}
 \vspace{0.4cm}
 \rule{\linewidth}{0.5pt}\\[0.6cm]
-{\large\itshape Računarski potpomognuta dijagnostika hernije diska\\
-uz vizuelno objašnjenje pomoću Grad-CAM metode\par}
+{\large\itshape Poređenje konvolucione mreže (ResNet-50) i vizuelnog\\
+transformera (ViT) uz vizuelno objašnjenje pomoću Grad-CAM metode\par}
 
 \vfill
 
@@ -137,19 +137,23 @@ Resonance Imaging}, MRI) od strane iskusnog radiologa. Zbog visoke cene pregleda
 neravnomerne raspoređenosti zdravstvenih resursa, sistemi koji automatski analiziraju
 MRI snimke lumbalne kičme postaju sve značajniji. U ovom radu predstavljen je sistem
 za automatsku klasifikaciju aksijalnih MRI preseka lumbalne kičme u dve kategorije:
-\textit{hernija diska} i \textit{uredan nalaz}. Sistem se zasniva na konvolucionoj
-neuronskoj mreži arhitekture ResNet-50, a za vizuelnu interpretaciju odluka modela
-korišćena je Grad-CAM metoda, koja ističe regione snimka koji su najviše uticali na
-predikciju. Model je treniran i evaluiran na javno dostupnom skupu podataka sa
-platforme Kaggle. Na test skupu postignuta je tačnost od [XX{,}X\%], senzitivnost od
-[XX{,}X\%] i specifičnost od [XX{,}X\%], što je uporedivo sa rezultatima iz relevantne
-literature. Grad-CAM mape potvrđuju da se model pretežno fokusira na region
+\textit{hernija diska} i \textit{uredan nalaz}. Upoređene su dve arhitekture:
+konvoluciona neuronska mreža ResNet-50, trenirana od nule, i vizuelni transformer
+(\textit{Vision Transformer}, ViT-Base/16), fino podešen polazeći od težina
+predtreniranih na skupu ImageNet-21k. Za vizuelnu interpretaciju odluka konvolucionog
+modela korišćena je Grad-CAM metoda, koja ističe regione snimka koji su najviše uticali
+na predikciju. Modeli su trenirani i evaluirani na javno dostupnom skupu podataka sa
+platforme Kaggle, uz augmentaciju i regularizaciju. Najbolji model na test skupu postiže
+tačnost od [XX{,}X\%], senzitivnost od [XX{,}X\%] i specifičnost od [XX{,}X\%], što je
+uporedivo sa rezultatima iz relevantne literature. Grad-CAM mape potvrđuju da se
+konvolucioni model pretežno fokusira na region
 intervertebralnog diska i duralne vreće, što je u skladu sa kliničkim kriterijumima
 dijagnostike.
 
 \vspace{0.3cm}
 \noindent\textbf{Ključne reči:} hernija lumbalnog diska, MRI, duboko učenje,
-konvolucione neuronske mreže, ResNet, Grad-CAM, računarski potpomognuta dijagnostika.
+konvolucione neuronske mreže, ResNet, vizuelni transformer (ViT), Grad-CAM,
+računarski potpomognuta dijagnostika.
 
 \newpage
 \tableofcontents
@@ -205,17 +209,22 @@ referencu na koju se oslanjamo, kako po izboru ulaznih podataka (aksijalni prese
 i po ideji vizuelnog objašnjenja predikcije.
 
 Sa metodološke strane, oslanjamo se na rezidualne mreže (ResNet)~\cite{he2016deep}, koje
-su uvođenjem rezidualnih veza omogućile stabilno treniranje vrlo dubokih mreža, kao i na
-Grad-CAM~\cite{selvaraju2017gradcam} metodu za generisanje toplotnih mapa značajnosti
-koje objašnjavaju odluku konvolucione mreže.
+su uvođenjem rezidualnih veza omogućile stabilno treniranje vrlo dubokih mreža, na
+vizuelne transformere (ViT)~\cite{dosovitskiy2021vit}, koji su pokazali da se
+arhitektura zasnovana na pažnji (\textit{self-attention}) može uspešno primeniti na
+klasifikaciju slika, kao i na Grad-CAM~\cite{selvaraju2017gradcam} metodu za generisanje
+toplotnih mapa značajnosti koje objašnjavaju odluku konvolucione mreže.
 
 \paragraph{Cilj projekta.}
 Cilj ovog projekta je da se razvije i evaluira sistem za binarnu klasifikaciju aksijalnih
-MRI preseka lumbalne kičme u kategorije \textit{hernija diska} i \textit{uredan nalaz},
-korišćenjem konvolucione neuronske mreže ResNet-50, kao i da se odluke modela učine
-interpretabilnim pomoću Grad-CAM toplotnih mapa. Dodatni cilj je da se postignuti
-rezultati uporede sa rezultatima iz literature~\cite{hou2023mri} i da se analiziraju
-tipični uspesi i promašaji modela.
+MRI preseka lumbalne kičme u kategorije \textit{hernija diska} i \textit{uredan nalaz}.
+Pri tome se upoređuju dve reprezentativne familije arhitektura: konvoluciona neuronska
+mreža ResNet-50~\cite{he2016deep}, trenirana od nule, i vizuelni transformer
+ViT-Base/16~\cite{dosovitskiy2021vit}, fino podešen polazeći od težina predtreniranih na
+velikom skupu ImageNet-21k. Dodatni ciljevi su da se odluke konvolucionog modela učine
+interpretabilnim pomoću Grad-CAM toplotnih mapa, da se postignuti rezultati uporede sa
+rezultatima iz literature~\cite{hou2023mri} i da se analiziraju tipični uspesi i promašaji
+modela.
 
 % ===========================================================================
 % 2. METODA
@@ -237,6 +246,29 @@ $\mathcal{F}(x)$, dok se ulaz $x$ prosleđuje preko \textit{skip} veze, tako da 
 računa $\mathcal{H}(x)=\mathcal{F}(x)+x$. Ovakve veze ublažavaju problem nestajućeg
 gradijenta i omogućavaju stabilno treniranje dubokih mreža.
 
+\paragraph{Vizuelni transformer (ViT).}
+Vizuelni transformer (engl.\ \textit{Vision Transformer}, ViT)~\cite{dosovitskiy2021vit}
+primenjuje arhitekturu transformera, izvorno razvijenu za obradu prirodnog jezika, na
+slike. Ulazna slika se deli na mrežu nepreklapajućih isečaka (engl.\ \textit{patches})
+veličine $16\times16$ piksela; svaki isečak se linearno projektuje u vektor (token), a
+dodaju mu se i pozicione informacije (engl.\ \textit{positional embedding}). Niz tokena,
+zajedno sa posebnim klasifikacionim tokenom \texttt{[CLS]}, prolazi kroz slojeve
+samopažnje (engl.\ \textit{multi-head self-attention}), koji za razliku od konvolucija
+modeluju \textit{globalne} zavisnosti između svih delova slike već u prvom sloju. Konačna
+klasifikacija se izvodi iz reprezentacije \texttt{[CLS]} tokena. Pošto transformeri nemaju
+ugrađenu induktivnu pristrasnost konvolucija (lokalnost, translatorna invarijantnost),
+za dobre rezultate na malim skupovima podataka po pravilu je neophodno
+\textit{predtreniranje} na velikim skupovima. U ovom radu koristi se varijanta
+ViT-Base/16, predtrenirana na skupu ImageNet-21k, koja se zatim fino podešava (engl.\
+\textit{fine-tuning}) na našem zadatku.
+
+\paragraph{Augmentacija podataka.}
+Radi smanjenja preprilagođavanja (engl.\ \textit{overfitting}) na trening skup, tokom
+treniranja se primenjuje augmentacija: slučajno isecanje sa promenom razmere (engl.\
+\textit{random resized crop}), horizontalno preslikavanje, rotacija u malom opsegu i
+blaga promena osvetljenja i kontrasta (engl.\ \textit{color jitter}). Na validacioni i
+test skup ne primenjuje se augmentacija, već samo deterministička transformacija.
+
 \paragraph{Funkcija gubitka i optimizacija.}
 Za klasifikaciju u $C$ klasa koristi se unakrsna entropija (engl.\ \textit{cross-entropy})
 \begin{equation}
@@ -247,7 +279,9 @@ gde je $y_c$ indikator tačne klase, $\hat{p}_c$ verovatnoća koju model dodelju
 $c$ (dobijena \textit{softmax} funkcijom nad izlaznim logitima), a $w_c$ težinski faktor
 klase koji kompenzuje neuravnoteženost skupa podataka i računa se kao odnos veličine
 najveće klase i veličine klase $c$. Optimizacija parametara vrši se algoritmom
-Adam~\cite{kingma2015adam}, uz kosinusno opadanje stope učenja (engl.\ \textit{cosine
+Adam~\cite{kingma2015adam} (za ResNet-50), odnosno njegovom varijantom sa razdvojenim
+opadanjem težina AdamW~\cite{loshchilov2019adamw} (za ViT, što je standardan izbor za
+fino podešavanje transformera), uz kosinusno opadanje stope učenja (engl.\ \textit{cosine
 annealing})~\cite{loshchilov2017sgdr}. Radi regularizacije koriste se \textit{dropout}
 sloj~\cite{srivastava2014dropout} i $L_2$ regularizacija težina (engl.\ \textit{weight
 decay}).
@@ -273,9 +307,10 @@ opseg $[0,1]$ i naložna prikazuje preko ulaznog snimka.
 \label{sec:pipeline}
 
 Ceo sistem je prikazan blok-dijagramom na slici~\ref{fig:blokdijagram}. Sastoji se iz
-četiri glavna bloka: (1) priprema podataka, (2) konvoluciona mreža (klasifikator),
-(3) treniranje i (4) evaluacija sa Grad-CAM vizuelizacijom. Pojedinačni blokovi su
-detaljno opisani u nastavku.
+četiri glavna bloka: (1) priprema podataka (sa augmentacijom), (2) klasifikator ---
+jedna od dve arhitekture, ResNet-50 ili ViT-Base/16, (3) treniranje i (4) evaluacija sa
+Grad-CAM vizuelizacijom (primenljivom samo na konvolucioni model). Pojedinačni blokovi
+su detaljno opisani u nastavku.
 
 \begin{figure}[H]
 \centering
@@ -287,13 +322,13 @@ detaljno opisani u nastavku.
     blokn/.style={blok,fill=bloknarandzasta},
     strelica/.style={-{Stealth[length=2.5mm]},thick}
 ]
-\node[blok] (data) {Priprema podataka\\\scriptsize (učitavanje, deljenje,\\\scriptsize transformacije)};
+\node[blok] (data) {Priprema podataka\\\scriptsize (učitavanje, deljenje,\\\scriptsize augmentacija)};
 \node[blok,right=of data] (pre) {Pretprocesiranje\\\scriptsize resize $224\!\times\!224$,\\\scriptsize normalizacija};
-\node[blokz,right=of pre] (cnn) {ResNet-50\\\scriptsize backbone};
-\node[blokz,below=of cnn] (head) {Dropout + FC\\\scriptsize (2 klase) + softmax};
-\node[blokn,below=of pre] (train) {Treniranje\\\scriptsize Adam, CE gubitak,\\\scriptsize cosine LR};
+\node[blokz,right=of pre] (cnn) {Klasifikator\\\scriptsize ResNet-50 (od nule)\\\scriptsize \emph{ili} ViT-B/16 (pretr.)};
+\node[blokz,below=of cnn] (head) {Glava + softmax\\\scriptsize (2 klase)};
+\node[blokn,below=of pre] (train) {Treniranje\\\scriptsize Adam/AdamW, CE,\\\scriptsize cosine LR};
 \node[blokn,below=of data] (eval) {Evaluacija\\\scriptsize tačnost, matrica\\\scriptsize konfuzije};
-\node[blok,below=of eval,fill=white] (cam) {Grad-CAM\\\scriptsize toplotne mape};
+\node[blok,below=of eval,fill=white] (cam) {Grad-CAM\\\scriptsize toplotne mape\\\scriptsize (samo ResNet)};
 
 \draw[strelica] (data) -- (pre);
 \draw[strelica] (pre) -- (cnn);
@@ -358,51 +393,72 @@ uputstvo za reprodukciju.)}
 Svaki snimak se skalira na rezoluciju $224\times224$ piksela i konvertuje u tenzor, nakon
 čega se normalizuje po kanalima korišćenjem standardnih ImageNet~\cite{deng2009imagenet}
 statistika (srednje vrednosti $[0{,}485;\,0{,}456;\,0{,}406]$ i standardne devijacije
-$[0{,}229;\,0{,}224;\,0{,}225]$). Ista transformacija primenjuje se na trening,
-validacioni i test skup. Zbog blage neuravnoteženosti klasa, u funkciji gubitka koriste
-se težine klasa (videti jednačinu~\ref{eq:ce}).
+$[0{,}229;\,0{,}224;\,0{,}225]$). Na \textbf{trening} skup dodatno se primenjuje
+augmentacija: slučajno isecanje sa promenom razmere (\textit{random resized crop} sa
+faktorom $0{,}8$--$1{,}0$), horizontalno preslikavanje (verovatnoća $0{,}5$), rotacija u
+opsegu $\pm10^\circ$ i blaga promena osvetljenja i kontrasta (\textit{color jitter} sa
+intenzitetom $0{,}2$). Na \textbf{validacioni} i \textbf{test} skup primenjuje se samo
+deterministička transformacija (skaliranje i normalizacija), bez augmentacije. Zbog blage
+neuravnoteženosti klasa, u funkciji gubitka koriste se težine klasa (videti
+jednačinu~\ref{eq:ce}).
 
-\subsection{Arhitektura klasifikatora}
+\subsection{Arhitekture klasifikatora}
 \label{sec:arh}
 
+Upoređene su dve arhitekture, predstavnici dveju različitih familija modela za
+klasifikaciju slika.
+
+\paragraph{ResNet-50 (konvolucioni model).}
 Kao osnova (\textit{backbone}) koristi se ResNet-50~\cite{he2016deep}. Originalni
 klasifikacioni sloj zamenjen je sekvencom koja se sastoji od \textit{dropout} sloja
-(verovatnoća $0{,}3$) i potpuno povezanog (\textit{fully-connected}) sloja sa dva izlaza,
-po jedan za svaku klasu. Mreža se trenira \textit{od nule} (bez ImageNet predtreniranih
-težina), čime se ispituje sposobnost arhitekture da nauči obeležja specifična za MRI
-domen direktno iz dostupnih podataka.
+(verovatnoća $0{,}5$) i potpuno povezanog (\textit{fully-connected}) sloja sa dva izlaza,
+po jedan za svaku klasu. Ovaj model se trenira \textit{od nule} (bez ImageNet
+predtreniranih težina), čime se ispituje sposobnost arhitekture da nauči obeležja
+specifična za MRI domen direktno iz dostupnih podataka.
+
+\paragraph{ViT-Base/16 (transformer model).}
+Drugi model je vizuelni transformer ViT-Base/16~\cite{dosovitskiy2021vit}, učitan iz
+biblioteke \texttt{timm}~\cite{wightman2019timm}. Za razliku od ResNet-a, ViT se
+\textit{ne} trenira od nule već se fino podešava (\textit{fine-tuning}) polazeći od težina
+predtreniranih na velikom skupu ImageNet-21k. Razlog je što transformeri, usled
+nedostatka konvolucione induktivne pristrasnosti, slabo generalizuju kada se treniraju od
+nule na svega nekoliko hiljada slika; predtreniranje je stoga praktično neophodno. Glava
+za klasifikaciju (nad \texttt{[CLS]} tokenom) prilagođena je broju klasa (dve).
 
 \subsection{Treniranje}
 \label{sec:trening}
 
 Treniranje je izvedeno na iznajmljenom grafičkom procesoru \textbf{NVIDIA RTX 4090
-(24\,GB)} preko platforme \textit{vast.ai}. Korišćeni hiperparametri sumirani su u
-tabeli~\ref{tab:hiperparametri}. Optimizacija se vrši algoritmom Adam~\cite{kingma2015adam}
+(24\,GB)} preko platforme \textit{vast.ai}. Korišćeni hiperparametri za oba modela
+sumirani su u tabeli~\ref{tab:hiperparametri}. Optimizacija se vrši algoritmom
+Adam~\cite{kingma2015adam} za ResNet-50, odnosno AdamW~\cite{loshchilov2019adamw} za ViT,
 uz kosinusno opadanje stope učenja~\cite{loshchilov2017sgdr} tokom svih epoha. Radi
 stabilnosti treniranja primenjeno je odsecanje norme gradijenta (engl.\ \textit{gradient
 clipping}) na vrednost $1{,}0$, a tokom treniranja praćena je i prosečna norma gradijenta
-po epohi. Model sa najboljom tačnošću na validacionom skupu čuva se kao finalni model.
+po epohi. Tok treniranja praćen je pomoću alata Weights \& Biases (\textit{wandb}). Model
+sa najboljom tačnošću na validacionom skupu čuva se kao finalni model.
 
 \begin{table}[H]
 \centering
-\caption{Hiperparametri treniranja.}
+\caption{Hiperparametri treniranja za obe arhitekture.}
 \label{tab:hiperparametri}
-\begin{tabular}{ll}
+\begin{tabular}{lll}
 \toprule
-\textbf{Hiperparametar} & \textbf{Vrednost} \\
+\textbf{Hiperparametar} & \textbf{ResNet-50} & \textbf{ViT-Base/16} \\
 \midrule
-Arhitektura            & ResNet-50 (od nule) \\
-Ulazna rezolucija      & $224\times224$ \\
-Broj epoha             & 200 \\
-Veličina batch-a       & 128 \\
-Optimizator            & Adam \\
-Početna stopa učenja   & $5\times10^{-4}$ \\
-Raspored stope učenja  & Cosine annealing \\
-Weight decay ($L_2$)   & $5\times10^{-4}$ \\
-Dropout                & $0{,}3$ \\
-Funkcija gubitka       & Težinska unakrsna entropija \\
-Gradient clipping      & $1{,}0$ \\
-Seed                   & 42 \\
+Inicijalizacija        & od nule                 & ImageNet-21k (pretreniran) \\
+Ulazna rezolucija      & $224\times224$          & $224\times224$ \\
+Broj epoha             & 20                      & 20 \\
+Veličina batch-a       & 128                     & 128 \\
+Optimizator            & Adam                    & AdamW \\
+Početna stopa učenja   & $5\times10^{-4}$        & $2\times10^{-4}$ \\
+Raspored stope učenja  & Cosine annealing        & Cosine annealing \\
+Weight decay ($L_2$)   & $1\times10^{-3}$        & $1\times10^{-2}$ \\
+Dropout (glava)        & $0{,}5$                 & ugrađen u arhitekturu \\
+Augmentacija           & da                      & da \\
+Funkcija gubitka       & Težinska CE             & Težinska CE \\
+Gradient clipping      & $1{,}0$                 & $1{,}0$ \\
+Seed                   & 42                      & 42 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -433,17 +489,28 @@ relevantne regione.
 \subsection{Tok treniranja}
 \label{sec:krive}
 
-Na slici~\ref{fig:krive} prikazane su krive treniranja: gubitak (levo) i tačnost
-(sredina) za trening i validacioni skup, kao i prosečna norma gradijenta po epohi
+Na slici~\ref{fig:krive} prikazane su krive treniranja modela ResNet-50: gubitak (levo) i
+tačnost (sredina) za trening i validacioni skup, kao i prosečna norma gradijenta po epohi
 (desno). Krive pokazuju očekivano opadanje gubitka i porast tačnosti tokom treniranja,
-dok norma gradijenta ostaje stabilna zahvaljujući odsecanju gradijenta.
+dok norma gradijenta ostaje stabilna zahvaljujući odsecanju gradijenta. Odgovarajuće
+krive za model ViT prikazane su na slici~\ref{fig:krive-vit}; zahvaljujući predtreniranju,
+ViT konvergira u manjem broju epoha.
 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\linewidth]{figures/learning_curves.png}
-\caption{Krive treniranja: gubitak, tačnost i prosečna norma gradijenta po epohi za
-trening i validacioni skup.}
+\caption{Krive treniranja modela \textbf{ResNet-50}: gubitak, tačnost i prosečna norma
+gradijenta po epohi za trening i validacioni skup.}
 \label{fig:krive}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\placeholderbox{4.5cm}{Krive treniranja modela ViT-Base/16 (gubitak, tačnost, norma
+gradijenta). Generiše se pokretanjem \texttt{train\_vit.py} (datoteka
+\texttt{best\_model\_vit\_curves.png}); videti uputstvo za reprodukciju.}
+\caption{Krive treniranja modela \textbf{ViT-Base/16}.}
+\label{fig:krive-vit}
 \end{figure}
 
 \subsection{Konačni rezultati}
@@ -455,18 +522,19 @@ rezervisana mesta i popunjavaju se nakon evaluacije istreniranog modela.)}
 
 \begin{table}[H]
 \centering
-\caption{Rezultati klasifikacije na test skupu. Pozitivna klasa: hernija diska.}
+\caption{Rezultati klasifikacije na test skupu za obe arhitekture. Pozitivna klasa:
+hernija diska.}
 \label{tab:rezultati}
-\begin{tabular}{lc}
+\begin{tabular}{lcc}
 \toprule
-\textbf{Metrika} & \textbf{Vrednost} \\
+\textbf{Metrika} & \textbf{ResNet-50} & \textbf{ViT-Base/16} \\
 \midrule
-Tačnost (Accuracy)        & [XX{,}X\%] \\
-Senzitivnost (Sensitivity)& [XX{,}X\%] \\
-Specifičnost (Specificity)& [XX{,}X\%] \\
-Preciznost (Precision)    & [XX{,}X\%] \\
-F1 mera                   & [0{,}XX] \\
-AUC                       & [0{,}XX] \\
+Tačnost (Accuracy)        & [XX{,}X\%] & [XX{,}X\%] \\
+Senzitivnost (Sensitivity)& [XX{,}X\%] & [XX{,}X\%] \\
+Specifičnost (Specificity)& [XX{,}X\%] & [XX{,}X\%] \\
+Preciznost (Precision)    & [XX{,}X\%] & [XX{,}X\%] \\
+F1 mera                   & [0{,}XX]   & [0{,}XX] \\
+AUC                       & [0{,}XX]   & [0{,}XX] \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -489,6 +557,10 @@ značajnosti (sredina) i njihova superpozicija (desno), zajedno sa tačnom i pre
 klasom. Uočava se da se kod ispravno klasifikovanih primera aktivacije pretežno
 koncentrišu u regionu intervertebralnog diska i duralne vreće, što je u skladu sa
 anatomskim kriterijumima dijagnostike i sa zapažanjima iz literature~\cite{hou2023mri}.
+Napomenimo da je Grad-CAM primenljiv samo na konvolucioni model (ResNet-50), pošto se
+oslanja na prostorne mape obeležja konvolucionih slojeva. Vizuelni transformer takve mape
+nema, te bi za njegovu interpretaciju bile potrebne metode zasnovane na pažnji (npr.\
+\textit{attention rollout}), što ostavljamo za budući rad.
 
 \begin{figure}[H]
 \centering
@@ -519,35 +591,39 @@ Grad-CAM gde je \texttt{pred} $\neq$ \texttt{true}.}
 \subsection{Poređenje sa literaturom}
 \label{sec:poredjenje}
 
-U tabeli~\ref{tab:poredjenje} naši rezultati upoređeni su sa rezultatima Hou i
-saradnika~\cite{hou2023mri}. Treba imati u vidu da poređenje nije potpuno direktno: oni
-koriste polu-nadgledano kontrastivno predtreniranje i višeslojni ulaz (tri susedna
-aksijalna preseka), dok mi koristimo jednostavniji, potpuno nadgledani pristup sa jednim
-presekom i mrežom treniranom od nule. Uprkos tome, dobijene vrednosti su uporedive, što
-sugeriše da i direktan CNN klasifikator može da postigne kliničkog interesantne rezultate
-na ovom zadatku.
+U tabeli~\ref{tab:poredjenje} naši rezultati za obe arhitekture upoređeni su sa
+rezultatima Hou i saradnika~\cite{hou2023mri}. Treba imati u vidu da poređenje nije
+potpuno direktno: oni koriste polu-nadgledano kontrastivno predtreniranje i višeslojni
+ulaz (tri susedna aksijalna preseka), dok mi koristimo potpuno nadgledani pristup sa
+jednim presekom. Uprkos tome, dobijene vrednosti su uporedive, što sugeriše da i direktni
+klasifikatori mogu da postignu klinički interesantne rezultate na ovom zadatku.
 
 \begin{table}[H]
 \centering
-\caption{Poređenje sa rezultatima iz literature.}
+\caption{Poređenje rezultata obe arhitekture sa rezultatima iz literature.}
 \label{tab:poredjenje}
 \begin{tabular}{lcccc}
 \toprule
 \textbf{Metod} & \textbf{Tačnost} & \textbf{Senzitivnost} & \textbf{Specifičnost} & \textbf{AUC} \\
 \midrule
 Hou i sar.~\cite{hou2023mri} (polu-nadgledano) & $87{,}11\%$ & $87{,}50\%$ & $86{,}72\%$ & $0{,}9487$ \\
-Naš model (ResNet-50, nadgledano)              & [XX{,}X\%]  & [XX{,}X\%]  & [XX{,}X\%]  & [0{,}XX] \\
+Naš model --- ResNet-50 (od nule)              & [XX{,}X\%]  & [XX{,}X\%]  & [XX{,}X\%]  & [0{,}XX] \\
+Naš model --- ViT-B/16 (pretreniran)           & [XX{,}X\%]  & [XX{,}X\%]  & [XX{,}X\%]  & [0{,}XX] \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paragraph{Diskusija.}
 Glavne sličnosti sa literaturom su izbor aksijalnih preseka kao ulaza i upotreba
-toplotnih mapa za interpretaciju. Glavne razlike su u složenosti metode: naš pristup je
-jednostavniji za implementaciju i ne zahteva fazu samonadgledanog predtreniranja, ali je
-zato osetljiviji na količinu i kvalitet označenih podataka. Korišćenje samo jednog
-preseka umesto tri susedna potencijalno gubi deo informacije u vertikalnom pravcu, što
-može objasniti eventualne razlike u performansama na graničnim slučajevima.
+toplotnih mapa za interpretaciju. Glavne razlike su u složenosti metode: naš pristup ne
+zahteva fazu samonadgledanog predtreniranja na MRI podacima, ali je zato osetljiviji na
+količinu i kvalitet označenih podataka. Korišćenje samo jednog preseka umesto tri susedna
+potencijalno gubi deo informacije u vertikalnom pravcu, što može objasniti eventualne
+razlike u performansama na graničnim slučajevima. Što se tiče poređenja dve arhitekture,
+očekuje se da predtrenirani ViT bolje generalizuje na ovako malom skupu zahvaljujući
+znanju prenetom sa ImageNet-21k, dok ResNet-50 treniran od nule mora celokupnu
+reprezentaciju da nauči iz svega nekoliko hiljada snimaka; konačno poređenje sledi iz
+popunjenih vrednosti u tabeli~\ref{tab:rezultati}.
 
 % ===========================================================================
 % 4. ZAKLJUČAK
@@ -556,20 +632,23 @@ može objasniti eventualne razlike u performansama na graničnim slučajevima.
 \label{sec:zakljucak}
 
 U ovom radu predstavljen je sistem za binarnu klasifikaciju aksijalnih MRI preseka
-lumbalne kičme u kategorije hernija diska i uredan nalaz, zasnovan na konvolucionoj
-neuronskoj mreži ResNet-50. Pokazano je da relativno jednostavan, potpuno nadgledani
-pristup postiže rezultate uporedive sa složenijom polu-nadgledanom metodom iz
-literature~\cite{hou2023mri}. Primenom Grad-CAM metode potvrđeno je da se model pretežno
-fokusira na anatomski relevantne regione, čime se povećava poverenje u njegove odluke i
-omogućava lakše otkrivanje uzroka grešaka.
+lumbalne kičme u kategorije hernija diska i uredan nalaz, pri čemu su upoređene dve
+arhitekture: konvoluciona mreža ResNet-50 trenirana od nule i vizuelni transformer
+ViT-Base/16 fino podešen polazeći od ImageNet-21k predtreniranih težina. Pokazano je da
+relativno jednostavni, potpuno nadgledani pristupi postižu rezultate uporedive sa
+složenijom polu-nadgledanom metodom iz literature~\cite{hou2023mri}. Primenom Grad-CAM
+metode na konvolucioni model potvrđeno je da se on pretežno fokusira na anatomski
+relevantne regione, čime se povećava poverenje u njegove odluke i omogućava lakše
+otkrivanje uzroka grešaka.
 
 \paragraph{Smernice za budući rad.}
-Kao pravci daljeg istraživanja izdvajaju se: (i) korišćenje predtreniranih težina
-(transfer učenje) i augmentacije podataka radi poboljšanja generalizacije; (ii) prelazak
-sa jednog na više susednih aksijalnih preseka, po uzoru na~\cite{hou2023mri}, radi
-uključivanja vertikalne informacije; (iii) proširenje na više klasa (npr.\ stepenovanje
-težine stenoze) i (iv) kvantitativna evaluacija kvaliteta Grad-CAM mapa u saradnji sa
-radiologom.
+Kao pravci daljeg istraživanja izdvajaju se: (i) sistematsko poređenje konvolucionih i
+transformer arhitektura uz unakrsnu validaciju i analizu uticaja predtreniranja;
+(ii) interpretabilnost ViT modela pomoću metoda zasnovanih na pažnji (npr.\ \textit{attention
+rollout}), pošto Grad-CAM nije primenljiv na transformere; (iii) prelazak sa jednog na
+više susednih aksijalnih preseka, po uzoru na~\cite{hou2023mri}, radi uključivanja
+vertikalne informacije; (iv) proširenje na više klasa (npr.\ stepenovanje težine stenoze)
+i (v) kvantitativna evaluacija kvaliteta toplotnih mapa u saradnji sa radiologom.
 
 % ===========================================================================
 % LITERATURA
