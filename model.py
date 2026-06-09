@@ -11,6 +11,10 @@ IMG_MEAN = [0.485, 0.456, 0.406]
 IMG_STD  = [0.229, 0.224, 0.225]
 
 
+def build_resnet50(num_classes: int, pretrained: bool = False) -> nn.Module:
+    return build_model(num_classes, pretrained)
+
+
 def build_model(num_classes: int, pretrained: bool = False) -> nn.Module:
     weights = models.ResNet50_Weights.DEFAULT if pretrained else None
     model = models.resnet50(weights=weights)
@@ -19,6 +23,19 @@ def build_model(num_classes: int, pretrained: bool = False) -> nn.Module:
         nn.Linear(model.fc.in_features, num_classes),
     )
     return model
+
+
+def build_vit(num_classes: int, pretrained: bool = True) -> nn.Module:
+    """
+    ViT-Base/16 from timm, pretrained on ImageNet-21k.
+    Standard choice for small-N classification tasks.
+    """
+    import timm
+    return timm.create_model(
+        "vit_base_patch16_224",
+        pretrained=pretrained,
+        num_classes=num_classes,
+    )
 
 
 class GradCAM:
