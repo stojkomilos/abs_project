@@ -472,8 +472,29 @@ Uredan nalaz (No Stenosis)     & 3152 & 1507 & 4659 \\
 
 Validacioni skup formiran je objedinjavanjem $15\%$ stratifikovano izdvojenih snimaka iz
 \texttt{train} foldera i snimaka iz \texttt{test} foldera, dok je preostalih $85\%$
-\texttt{train} foldera korišćeno za treniranje. Primeri snimaka iz obe klase prikazani su
-na slici~\ref{fig:primeri}.
+\texttt{train} foldera korišćeno za treniranje. Tačan broj snimaka u trening i
+validacionom skupu, kao i raspodela po klasama, dat je u tabeli~\ref{tab:split}.
+
+\begin{table}[H]
+\centering
+\caption{Broj snimaka u trening i validacionom skupu (nakon podele i izostavljanja klase
+\textit{Thecal Sac}), sa raspodelom po klasama.}
+\label{tab:split}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Skup} & \textbf{Hernija diska} & \textbf{Uredan nalaz} & \textbf{Ukupno} \\
+\midrule
+Trening skup     & [N] & [N] & [N] \\
+Validacioni skup & [N] & [N] & [N] \\
+\bottomrule
+\end{tabular}
+
+\vspace{2pt}
+{\footnotesize Vrednosti označene sa [N] su rezervisana mesta i popunjavaju se tačnim
+brojevima dobijenim pri podeli podataka.}
+\end{table}
+
+Primeri snimaka iz obe klase prikazani su na slici~\ref{fig:primeri}.
 
 \paragraph{Napomena o prikupljanju podataka.}
 U ovom projektu nisu vršena sopstvena snimanja niti merenja na ispitanicima --- korišćen

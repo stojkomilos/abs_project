@@ -27,13 +27,13 @@ from model import build_model, build_vit, save_gradcam, GradCAM
 MODEL_TYPE = "vit"   # "resnet50" | "vit"
 
 DATA_ROOT        = "/root/dataset/LumbarSpinalStenosis/LumbarSpinalStenosis"
-EPOCHS           = 2000
+EPOCHS           = 700
 BATCH            = 128
 IMG_SIZE         = 224
 MAX_TRAIN        = None          # None = full dataset
-MAX_VAL          = None           # None = full val; 0 or -1 = skip val entirely
+MAX_VAL          = 128           # None = full val; 0 or -1 = skip val entirely
 EXCLUDE_CLASSES  = {"Thecal Sac"}
-GRAD_CLIP        = 1.0
+GRAD_CLIP        = 5.0
 CKPT_INTERVAL    = 900           # seconds between intermediary saves (15 min)
 GRADCAM_INTERVAL = 2             # epochs between GradCAM logs (ResNet only)
 N_GRADCAM_VIZ    = 2             # samples per split per GradCAM log
